@@ -546,7 +546,7 @@ public class SparkClient extends AbsRdbmsClient {
             }
 
             // 兼容一下返回值 Type 的情况
-            if ("Type".equals(colName.trim())  && StringUtils.isEmpty(tableInfo.getExternalOrManaged())) {
+            if (("Type".equals(colName.trim()) || "Type:".equals(colName.trim()))  && StringUtils.isEmpty(tableInfo.getExternalOrManaged())) {
                 if (ReflectUtil.fieldExists(Table.class, "isView")) {
                     tableInfo.setIsView(StringUtils.containsIgnoreCase(dataType, "VIEW"));
                 }
