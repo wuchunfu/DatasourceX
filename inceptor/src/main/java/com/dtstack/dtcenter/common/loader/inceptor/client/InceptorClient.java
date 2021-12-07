@@ -114,7 +114,7 @@ public class InceptorClient extends AbsRdbmsClient {
         InceptorSourceDTO inceptorSourceDTO = (InceptorSourceDTO) sourceDTO;
         StringBuilder constr = new StringBuilder();
         if (Objects.nonNull(queryDTO) && StringUtils.isNotBlank(queryDTO.getTableNamePattern())) {
-            constr.append(String.format(SEARCH_SQL, addPercentSign(queryDTO.getTableNamePattern().trim())));
+            constr.append(String.format(SEARCH_SQL, addFuzzySign(queryDTO)));
         }
         // 获取表信息需要通过show tables 语句
         String sql = String.format(SHOW_TABLE_SQL, constr.toString());
@@ -674,8 +674,8 @@ public class InceptorClient extends AbsRdbmsClient {
     }
 
     @Override
-    protected String addPercentSign(String str) {
-        return "*" + str + "*";
+    protected String getFuzzySign() {
+        return "*";
     }
 
     @Override
