@@ -41,7 +41,7 @@ public enum DataSourceType {
     GREENPLUM6(36, 40, "Greenplum", "greenplum6"),
     LIBRA(21, 41, "GaussDB", "libra"),
     GBase_8a(22, 42, "GBase_8a", "gbase"),
-    DORIS(57, 43, "DorisDB", "doris"),
+    DORIS(57, 43, "Doris0.14.x(jdbc)", "doris"),
 
     // FileSystem
     HDFS(6, 60, "HDFS", "hdfs"),
@@ -98,7 +98,7 @@ public enum DataSourceType {
     TBDS_HDFS(60, 136, "TBDS_HDFS", "tbds_hdfs"),
     TBDS_HBASE(61, 137, "TBDS_HBASE", "tbds_hbase"),
     TBDS_KAFKA(62, 138, "TBDS_KAFKA", "tbds_kafka"),
-    DorisRestful(64, 139, "DorisRestful", "dorisrestful"),
+    DorisRestful(64, 139, "Doris0.14.x(http)", "dorisrestful"),
     ;
 
     DataSourceType(int val, int order, String name, String pluginName) {
