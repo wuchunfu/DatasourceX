@@ -47,7 +47,7 @@ public class DBUtil {
      * @return
      */
     public static List<Map<String, Object>> executeQuery(Connection conn, String sql) {
-        return executeQuery(conn, sql, MAX_QUERY_ROW, null, null);
+        return executeQuery(conn, sql, MAX_QUERY_ROW, null, null, null);
     }
 
     /**
@@ -59,7 +59,7 @@ public class DBUtil {
      * @param queryTimeout
      * @return
      */
-    public static List<Map<String, Object>> executeQuery(Connection conn, String sql, Integer limit, Integer queryTimeout, CallBack<Object, Object> fieldProcess) {
+    public static List<Map<String, Object>> executeQuery(Connection conn, String sql, Integer limit, Integer queryTimeout, Boolean setMaxRow, CallBack<Object, Object> fieldProcess) {
         List<Map<String, Object>> result = Lists.newArrayList();
         ResultSet res = null;
         Statement statement = null;
@@ -72,8 +72,10 @@ public class DBUtil {
                     log.debug(String.format("statement set QueryTimeout exception,%s", e.getMessage()), e);
                 }
             }
-            // 设置返回最大条数
-            statement.setMaxRows(Objects.isNull(limit) ? MAX_QUERY_ROW : limit);
+            if (Objects.isNull(setMaxRow) || BooleanUtils.isTrue(setMaxRow)) {
+                // 设置返回最大条数
+                statement.setMaxRows(Objects.isNull(limit) ? MAX_QUERY_ROW : limit);
+            }
 
             if (statement.execute(sql)) {
                 res = statement.getResultSet();
@@ -117,7 +119,7 @@ public class DBUtil {
      * @param queryTimeout
      * @return
      */
-    public static List<Map<String, Object>> executeQuery(Connection conn, String sql, Integer limit, List<Object> preFields, Integer queryTimeout, CallBack<Object, Object> fieldProcess) {
+    public static List<Map<String, Object>> executeQuery(Connection conn, String sql, Integer limit, List<Object> preFields, Integer queryTimeout, Boolean setMaxRow, CallBack<Object, Object> fieldProcess) {
         List<Map<String, Object>> result = Lists.newArrayList();
         ResultSet res = null;
         PreparedStatement statement = null;
@@ -131,8 +133,10 @@ public class DBUtil {
                     log.debug(String.format("statement set QueryTimeout exception,%s", e.getMessage()), e);
                 }
             }
-            // 设置返回最大条数
-            statement.setMaxRows(Objects.isNull(limit) ? MAX_QUERY_ROW : limit);
+            if (Objects.isNull(setMaxRow) || BooleanUtils.isTrue(setMaxRow)) {
+                // 设置返回最大条数
+                statement.setMaxRows(Objects.isNull(limit) ? MAX_QUERY_ROW : limit);
+            }
 
             //todo 支持预编译sql
             if (preFields != null && !preFields.isEmpty()) {
