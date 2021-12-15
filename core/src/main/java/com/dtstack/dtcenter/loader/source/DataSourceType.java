@@ -99,6 +99,11 @@ public enum DataSourceType {
     TBDS_HBASE(61, 137, "TBDS_HBASE", "tbds_hbase"),
     TBDS_KAFKA(62, 138, "TBDS_KAFKA", "tbds_kafka"),
     DorisRestful(64, 139, "DorisRestful", "dorisrestful"),
+
+    DRDS(72, 145, "DRDS", "mysql5"),
+    UPDRDB(73, 146, "UPDRDB", "mysql5"),
+    UPRedis(74, 147, "UPRedis", "redis"),
+    CSP_S3(75, 148, "CSP S3", "csp_s3"),
     ;
 
     DataSourceType(int val, int order, String name, String pluginName) {
@@ -147,6 +152,8 @@ public enum DataSourceType {
         RDBM_S.add(KINGBASE8.val);
         RDBM_S.add(TRINO.val);
         RDBM_S.add(DMDB_For_Oracle.val);
+        RDBM_S.add(DRDS.val);
+        RDBM_S.add(UPDRDB.val);
 
         KAFKA_S.add(KAFKA.val);
         KAFKA_S.add(KAFKA_09.val);
