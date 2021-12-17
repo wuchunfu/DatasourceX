@@ -131,6 +131,7 @@ public interface DtClassConsistent {
     class HadoopConfConsistent {
         public static final String HADOOP_CONFIG = "hadoopConfig";
 
+        @Deprecated
         public static final String DEFAULT_FS_REGEX = "hdfs://.*";
 
         public static final String TABLE_INFORMATION = "detailed table information";
