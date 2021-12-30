@@ -1,6 +1,7 @@
 package com.dtstack.dtcenter.common.loader.solr;
 
 import com.dtstack.dtcenter.common.loader.common.nosql.AbsNoSqlClient;
+import com.dtstack.dtcenter.common.loader.common.utils.SearchUtil;
 import com.dtstack.dtcenter.common.loader.solr.pool.SolrManager;
 import com.dtstack.dtcenter.common.loader.solr.pool.SolrPool;
 import com.dtstack.dtcenter.loader.dto.ColumnMetaDTO;
@@ -10,7 +11,6 @@ import com.dtstack.dtcenter.loader.dto.source.SolrSourceDTO;
 import com.dtstack.dtcenter.loader.exception.DtLoaderException;
 import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -36,7 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * @author ：qianyi
@@ -147,15 +146,7 @@ public class DtSolrClient extends AbsNoSqlClient {
         CloudSolrClient solrClient = getClient(solrSourceDTO);
         try {
             List<String> tableList = CollectionAdminRequest.listCollections(solrClient);
-            if (CollectionUtils.isNotEmpty(tableList)) {
-                if (Objects.nonNull(queryDTO) && StringUtils.isNotBlank(queryDTO.getTableNamePattern())) {
-                    tableList = tableList.stream().filter(table -> table.contains(queryDTO.getTableNamePattern().trim())).collect(Collectors.toList());
-                }
-                if (Objects.nonNull(queryDTO) && Objects.nonNull(queryDTO.getLimit())) {
-                    tableList = tableList.stream().limit(queryDTO.getLimit()).collect(Collectors.toList());
-                }
-            }
-            return tableList;
+            return SearchUtil.handleSearchAndLimit(tableList, queryDTO);
         } catch (Exception e) {
             throw new DtLoaderException(String.format("get solr collections error, Cause by: %s", e.getMessage()), e);
         } finally {

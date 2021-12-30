@@ -26,10 +26,10 @@ public enum DataSourceType {
     SQLSERVER_2017_LATER(32, 5, "SQLServer JDBC", "sqlServer"),
     PostgreSQL(4, 6, "PostgreSQL", "postgresql"),
     DB2(19, 7, "DB2", "db2"),
-    DMDB(35, 8, "DMDB", "dmdb"),
+    DMDB(35, 8, "DMDB For MySQL", "dmdb"),
     RDBMS(5, 9, "RDBMS", "mysql"),
     KINGBASE8(40, 10, "KingbaseES8", "kingbase8"),
-    DMDB_For_Oracle(67, 8, "DMDB", "dmdb"),
+    DMDB_For_Oracle(67, 8, "DMDB For Oracle", "dmdb"),
 
     // Hadoop
     HIVE(7, 20, "Hive2.x", "hive"),
@@ -41,7 +41,7 @@ public enum DataSourceType {
     GREENPLUM6(36, 40, "Greenplum", "greenplum6"),
     LIBRA(21, 41, "GaussDB", "libra"),
     GBase_8a(22, 42, "GBase_8a", "gbase"),
-    DORIS(57, 43, "DorisDB", "doris"),
+    DORIS(57, 43, "Doris0.14.x(jdbc)", "doris"),
 
     // FileSystem
     HDFS(6, 60, "HDFS", "hdfs"),
@@ -69,7 +69,7 @@ public enum DataSourceType {
     HBASE2(39, 101, "HBase", "hbase"),
     Phoenix(30, 102, "Phoenix4.x", "phoenix"),
     PHOENIX5(38, 103, "Phoenix5.x", "phoenix5"),
-    ES(11, 104, "ElasticSearch5.x", "es"),
+    ES(11, 104, "ElasticSearch5.x", "es5"),
     ES6(33, 105, "ElasticSearch6.x", "es"),
     ES7(46, 106, "ElasticSearch7.x", "es7"),
     MONGODB(13, 107, "MongoDB", "mongo"),
@@ -98,7 +98,7 @@ public enum DataSourceType {
     TBDS_HDFS(60, 136, "TBDS_HDFS", "tbds_hdfs"),
     TBDS_HBASE(61, 137, "TBDS_HBASE", "tbds_hbase"),
     TBDS_KAFKA(62, 138, "TBDS_KAFKA", "tbds_kafka"),
-    DorisRestful(64, 139, "DorisRestful", "dorisrestful"),
+    DorisRestful(64, 139, "Doris0.14.x(http)", "dorisrestful"),
     HIVE3_CDP(65, 140, "Hive3_CDP", "hive3_cdp"),
 
     DRDS(72, 145, "DRDS", "mysql5"),

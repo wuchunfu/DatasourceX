@@ -58,27 +58,8 @@ public class Db2Client extends AbsRdbmsClient {
     }
 
     @Override
-    public List<String> getTableList(ISourceDTO iSource, SqlQueryDTO queryDTO) {
-        Integer clearStatus = beforeQuery(iSource, queryDTO, false);
-        Db2SourceDTO db2SourceDTO = (Db2SourceDTO) iSource;
-        Statement statement = null;
-        ResultSet rs = null;
-        List<String> tableList = new ArrayList<>();
-        try {
-            String sql = String.format(TABLE_QUERY, db2SourceDTO.getUsername().toUpperCase());
-            statement = db2SourceDTO.getConnection().createStatement();
-            DBUtil.setFetchSize(statement, queryDTO);
-            rs = statement.executeQuery(sql);
-            int columnSize = rs.getMetaData().getColumnCount();
-            while (rs.next()) {
-                tableList.add(rs.getString(1));
-            }
-        } catch (Exception e) {
-            throw new DtLoaderException(String.format("get table exception：%s", e.getMessage()), e);
-        } finally {
-            DBUtil.closeDBResources(rs, statement, DBUtil.clearAfterGetConnection(db2SourceDTO, clearStatus));
-        }
-        return tableList;
+    public List<String> getTableList(ISourceDTO sourceDTO, SqlQueryDTO queryDTO) {
+        return getTableListBySchema(sourceDTO, queryDTO);
     }
 
     @Override
@@ -148,7 +129,7 @@ public class Db2Client extends AbsRdbmsClient {
         log.info("current used schema：{}", schema);
         StringBuilder constr = new StringBuilder();
         if (StringUtils.isNotBlank(queryDTO.getTableNamePattern())) {
-            constr.append(String.format(SEARCH_SQL, addPercentSign(queryDTO.getTableNamePattern().trim())));
+            constr.append(String.format(SEARCH_SQL, addFuzzySign(queryDTO)));
         }
         if (Objects.nonNull(queryDTO.getLimit())) {
             constr.append(String.format(LIMIT_SQL, queryDTO.getLimit()));

@@ -5,6 +5,7 @@ import com.dtstack.dtcenter.common.loader.common.enums.StoredType;
 import com.dtstack.dtcenter.common.loader.common.utils.DBUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.EnvUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.ReflectUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.SearchUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.TableUtil;
 import com.dtstack.dtcenter.common.loader.hadoop.hdfs.HadoopConfUtil;
 import com.dtstack.dtcenter.common.loader.hadoop.hdfs.HdfsOperator;
@@ -114,7 +115,7 @@ public class InceptorClient extends AbsRdbmsClient {
         InceptorSourceDTO inceptorSourceDTO = (InceptorSourceDTO) sourceDTO;
         StringBuilder constr = new StringBuilder();
         if (Objects.nonNull(queryDTO) && StringUtils.isNotBlank(queryDTO.getTableNamePattern())) {
-            constr.append(String.format(SEARCH_SQL, addPercentSign(queryDTO.getTableNamePattern().trim())));
+            constr.append(String.format(SEARCH_SQL, addFuzzySign(queryDTO)));
         }
         // 获取表信息需要通过show tables 语句
         String sql = String.format(SHOW_TABLE_SQL, constr.toString());
@@ -144,7 +145,7 @@ public class InceptorClient extends AbsRdbmsClient {
         } finally {
             DBUtil.closeDBResources(rs, statement, DBUtil.clearAfterGetConnection(inceptorSourceDTO, clearStatus));
         }
-        return tableList;
+        return SearchUtil.handleSearchAndLimit(tableList, queryDTO);
     }
 
     @Override
@@ -674,8 +675,8 @@ public class InceptorClient extends AbsRdbmsClient {
     }
 
     @Override
-    protected String addPercentSign(String str) {
-        return "*" + str + "*";
+    protected String getFuzzySign() {
+        return "*";
     }
 
     @Override

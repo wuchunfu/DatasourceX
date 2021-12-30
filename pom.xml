@@ -6,13 +6,14 @@
 
     <groupId>com.dtstack.dtcenter</groupId>
     <artifactId>common-loader</artifactId>
-    <version>1.7.0-SNAPSHOT</version>
+    <version>1.8.0-SNAPSHOT</version>
     <modules>
         <module>core</module>
         <module>rdbms</module>
         <module>clickhouse</module>
         <module>db2</module>
         <module>dm</module>
+        <module>es5</module>
         <module>es</module>
         <module>es7</module>
         <module>gbase</module>

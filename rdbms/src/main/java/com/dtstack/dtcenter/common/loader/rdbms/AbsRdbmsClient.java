@@ -6,6 +6,7 @@ import com.dtstack.dtcenter.common.loader.common.exception.ErrorCode;
 import com.dtstack.dtcenter.common.loader.common.utils.CollectionUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.DBUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.ReflectUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.SearchUtil;
 import com.dtstack.dtcenter.loader.IDownloader;
 import com.dtstack.dtcenter.loader.cache.connection.CacheConnectionHelper;
 import com.dtstack.dtcenter.loader.client.IClient;
@@ -16,6 +17,7 @@ import com.dtstack.dtcenter.loader.dto.Table;
 import com.dtstack.dtcenter.loader.dto.source.ISourceDTO;
 import com.dtstack.dtcenter.loader.dto.source.RdbmsSourceDTO;
 import com.dtstack.dtcenter.loader.enums.ConnectionClearStatus;
+import com.dtstack.dtcenter.loader.enums.MatchType;
 import com.dtstack.dtcenter.loader.exception.DtLoaderException;
 import com.dtstack.dtcenter.loader.source.DataSourceType;
 import com.dtstack.dtcenter.loader.utils.AssertUtils;
@@ -40,7 +42,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 /**
  * @company: www.dtstack.com
@@ -208,10 +209,7 @@ public abstract class AbsRdbmsClient<T> implements IClient<T> {
             if (null == queryDTO) {
                 rs = meta.getTables(null, null, null, null);
             } else {
-                rs = meta.getTables(null, rdbmsSourceDTO.getSchema(),
-                        StringUtils.isNotBlank(queryDTO.getTableNamePattern()) ? queryDTO.getTableNamePattern() :
-                                queryDTO.getTableName(),
-                        DBUtil.getTableTypes(queryDTO));
+                rs = meta.getTables(null, rdbmsSourceDTO.getSchema(), null, DBUtil.getTableTypes(queryDTO));
             }
             while (rs.next()) {
                 tableList.add(rs.getString(3));
@@ -221,10 +219,7 @@ public abstract class AbsRdbmsClient<T> implements IClient<T> {
         } finally {
             DBUtil.closeDBResources(rs, null, DBUtil.clearAfterGetConnection(rdbmsSourceDTO, clearStatus));
         }
-        if (Objects.nonNull(queryDTO) && Objects.nonNull(queryDTO.getLimit())) {
-            tableList = tableList.stream().limit(queryDTO.getLimit()).collect(Collectors.toList());
-        }
-        return tableList;
+        return SearchUtil.handleSearchAndLimit(tableList, queryDTO);
     }
 
     /**
@@ -731,13 +726,40 @@ public abstract class AbsRdbmsClient<T> implements IClient<T> {
     }
 
     /**
-     * 在字符串前后添加 %
+     * 在字符串前后添加模糊匹配字符
      *
-     * @param str 需要添加 % 的字符串
-     * @return 添加 % 后的字符串
+     * @param queryDTO 查询信息
+     * @return 添加模糊匹配字符后的字符串
      */
-    protected String addPercentSign(String str) {
-        return "%" + str + "%";
+    protected String addFuzzySign(SqlQueryDTO queryDTO) {
+        String fuzzySign = getFuzzySign();
+        if (Objects.isNull(queryDTO) || StringUtils.isBlank(queryDTO.getTableNamePattern())) {
+            return fuzzySign;
+        }
+        String defaultSign = fuzzySign + queryDTO.getTableNamePattern() + fuzzySign;
+        if (!ReflectUtil.fieldExists(SqlQueryDTO.class, "matchType")
+                || Objects.isNull(queryDTO.getMatchType())) {
+            return defaultSign;
+        }
+        if (MatchType.ALL.equals(queryDTO.getMatchType())) {
+            return queryDTO.getTableNamePattern();
+        }
+        if (MatchType.PREFIX.equals(queryDTO.getMatchType())) {
+            return queryDTO.getTableNamePattern() + fuzzySign;
+        }
+        if (MatchType.SUFFIX.equals(queryDTO.getMatchType())) {
+            return fuzzySign + queryDTO.getTableNamePattern();
+        }
+        return defaultSign;
+    }
+
+    /**
+     * 获取模糊匹配字符
+     *
+     * @return 模糊匹配字符
+     */
+    protected String getFuzzySign() {
+        return "%";
     }
 
     @Override

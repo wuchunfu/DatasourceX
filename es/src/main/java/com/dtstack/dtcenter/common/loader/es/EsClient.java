@@ -6,6 +6,7 @@ import com.dtstack.dtcenter.common.loader.common.exception.IErrorPattern;
 import com.dtstack.dtcenter.common.loader.common.nosql.AbsNoSqlClient;
 import com.dtstack.dtcenter.common.loader.common.service.ErrorAdapterImpl;
 import com.dtstack.dtcenter.common.loader.common.service.IErrorAdapter;
+import com.dtstack.dtcenter.common.loader.common.utils.SearchUtil;
 import com.dtstack.dtcenter.common.loader.es.pool.ElasticSearchManager;
 import com.dtstack.dtcenter.common.loader.es.pool.ElasticSearchPool;
 import com.dtstack.dtcenter.loader.dto.ColumnMetaDTO;
@@ -130,7 +131,7 @@ public class EsClient<T> extends AbsNoSqlClient<T> {
         RestHighLevelClient client = getClient(esSourceDTO);
         List<String> typeList = Lists.newArrayList();
         //es索引
-        String index = queryDTO.getTableName();
+        String index = StringUtils.isNotBlank(queryDTO.getSchema()) ? queryDTO.getSchema() : queryDTO.getTableName();
         //不指定index抛异常
         if (StringUtils.isBlank(index)) {
             throw new DtLoaderException("The index of es is not specified, and the acquisition fails");
@@ -144,13 +145,13 @@ public class EsClient<T> extends AbsNoSqlClient<T> {
             MappingMetaData data = res.mappings().get(index);
             typeList.add(data.type());
         } catch (NullPointerException e) {
-            throw new DtLoaderException(String.format("index not exits,%s", e.getMessage()), e);
+            log.error("index not exits", e);
         } catch (Exception e) {
             log.error(String.format("get type exception,%s", e.getMessage()), e);
         } finally {
             closeResource(null, client, esSourceDTO);
         }
-        return typeList;
+        return SearchUtil.handleSearchAndLimit(typeList, queryDTO);
     }
 
 
@@ -198,7 +199,7 @@ public class EsClient<T> extends AbsNoSqlClient<T> {
         }
         RestHighLevelClient client = getClient(esSourceDTO);
         //索引
-        String index = queryDTO.getTableName();
+        String index = StringUtils.isNotBlank(queryDTO.getSchema()) ? queryDTO.getSchema() : queryDTO.getTableName();
         if (StringUtils.isBlank(index)) {
             throw new DtLoaderException("The index of es is not specified，Data preview failed");
         }
@@ -247,7 +248,7 @@ public class EsClient<T> extends AbsNoSqlClient<T> {
         }
         RestHighLevelClient client = getClient(esSourceDTO);
         //索引
-        String index = queryDTO.getTableName();
+        String index = StringUtils.isNotBlank(queryDTO.getSchema()) ? queryDTO.getSchema() : queryDTO.getTableName();
         if (StringUtils.isBlank(index)) {
             throw new DtLoaderException("The index of es is not specified, and the field information fails to be obtained");
         }
@@ -266,7 +267,7 @@ public class EsClient<T> extends AbsNoSqlClient<T> {
                 ColumnMetaDTO columnMetaDTO = new ColumnMetaDTO();
                 columnMetaDTO.setKey(meta);
                 Map<String, Object> map = (Map<String, Object>) metaDataMap.get(meta);
-                String type = (String) map.get("type");
+                String type = StringUtils.isNotBlank((String) map.get("type")) ? (String) map.get("type") : "object";
                 columnMetaDTO.setType(type);
                 columnMetaDTOS.add(columnMetaDTO);
             }
@@ -288,7 +289,7 @@ public class EsClient<T> extends AbsNoSqlClient<T> {
         }
         String dsl = doDealPageSql(queryDTO.getSql());
         //索引
-        String index = queryDTO.getTableName();
+        String index = StringUtils.isNotBlank(queryDTO.getSchema()) ? queryDTO.getSchema() : queryDTO.getTableName();
         if (StringUtils.isBlank(index)) {
             throw new DtLoaderException("The index of es is not specified, and the field information fails to be obtained. Please specify tableName as the index in sqlQueryDTO");
         }
@@ -430,7 +431,7 @@ public class EsClient<T> extends AbsNoSqlClient<T> {
             return false;
         }
         //索引
-        String index = queryDTO.getTableName();
+        String index = StringUtils.isNotBlank(queryDTO.getSchema()) ? queryDTO.getSchema() : queryDTO.getTableName();
 
         RestHighLevelClient client = null;
         RestClient lowLevelClient = null;

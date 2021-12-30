@@ -5,6 +5,7 @@ import com.dtstack.dtcenter.common.loader.common.DtClassConsistent;
 import com.dtstack.dtcenter.common.loader.common.enums.StoredType;
 import com.dtstack.dtcenter.common.loader.common.utils.DBUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.ReflectUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.SearchUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.TableUtil;
 import com.dtstack.dtcenter.common.loader.rdbms.AbsRdbmsClient;
 import com.dtstack.dtcenter.common.loader.rdbms.ConnFactory;
@@ -66,7 +67,7 @@ public class ImpalaClient extends AbsRdbmsClient {
         ImpalaSourceDTO impalaSourceDTO = (ImpalaSourceDTO) iSource;
         StringBuilder constr = new StringBuilder();
         if (Objects.nonNull(queryDTO) && StringUtils.isNotBlank(queryDTO.getTableNamePattern())) {
-            constr.append(String.format(SEARCH_SQL, addPercentSign(queryDTO.getTableNamePattern().trim())));
+            constr.append(String.format(SEARCH_SQL, addFuzzySign(queryDTO)));
         }
         // 获取表信息需要通过show tables 语句
         String sql = String.format(SHOW_TABLE_SQL, constr.toString());
@@ -90,7 +91,7 @@ public class ImpalaClient extends AbsRdbmsClient {
         } finally {
             DBUtil.closeDBResources(rs, statement, DBUtil.clearAfterGetConnection(impalaSourceDTO, clearStatus));
         }
-        return tableList;
+        return SearchUtil.handleSearchAndLimit(tableList, queryDTO);
     }
 
     @Override
@@ -375,8 +376,8 @@ public class ImpalaClient extends AbsRdbmsClient {
     }
 
     @Override
-    protected String addPercentSign(String str) {
-        return "*" + str + "*";
+    protected String getFuzzySign() {
+        return "*";
     }
 
     @Override

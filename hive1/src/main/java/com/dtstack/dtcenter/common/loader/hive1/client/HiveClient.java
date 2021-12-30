@@ -5,6 +5,7 @@ import com.dtstack.dtcenter.common.loader.common.enums.StoredType;
 import com.dtstack.dtcenter.common.loader.common.utils.DBUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.EnvUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.ReflectUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.SearchUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.TableUtil;
 import com.dtstack.dtcenter.common.loader.hadoop.hdfs.HadoopConfUtil;
 import com.dtstack.dtcenter.common.loader.hadoop.hdfs.HdfsOperator;
@@ -85,7 +86,7 @@ public class HiveClient extends AbsRdbmsClient {
     private static final String SHOW_TABLE_SQL = "show tables";
 
     // show tables like 'xxx'
-    private static final String SHOW_TABLE_LIKE_SQL = "show tables like '*%s*'";
+    private static final String SHOW_TABLE_LIKE_SQL = "show tables like '%s'";
 
     // desc db info
     private static final String DESC_DB_INFO = "desc database %s";
@@ -108,7 +109,7 @@ public class HiveClient extends AbsRdbmsClient {
         String sql;
         if (Objects.nonNull(queryDTO) && StringUtils.isNotEmpty(queryDTO.getTableNamePattern())) {
             // 模糊查询
-            sql = String.format(SHOW_TABLE_LIKE_SQL, queryDTO.getTableNamePattern());
+            sql = String.format(SHOW_TABLE_LIKE_SQL, addFuzzySign(queryDTO));
         } else {
             sql = SHOW_TABLE_SQL;
         }
@@ -132,7 +133,7 @@ public class HiveClient extends AbsRdbmsClient {
         } finally {
             DBUtil.closeDBResources(rs, statement, DBUtil.clearAfterGetConnection(hive1SourceDTO, clearStatus));
         }
-        return tableList;
+        return SearchUtil.handleSearchAndLimit(tableList, queryDTO);
     }
 
     @Override
@@ -674,5 +675,10 @@ public class HiveClient extends AbsRdbmsClient {
             DBUtil.closeDBResources(rs, statement, DBUtil.clearAfterGetConnection(rdbmsSourceDTO, clearStatus));
         }
         return createTableSql.toString();
+    }
+
+    @Override
+    protected String getFuzzySign() {
+        return "*";
     }
 }
