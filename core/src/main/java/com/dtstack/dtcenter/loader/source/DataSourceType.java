@@ -107,6 +107,8 @@ public enum DataSourceType {
     UPDRDB(73, 146, "UPDRDB", "mysql5"),
     UPRedis(74, 147, "UPRedis", "redis"),
     CSP_S3(75, 148, "CSP S3", "csp_s3"),
+    HUAWEI_KAFKA(70, 143, "HUAWEI_KAFKA", "huawei_kafka"),
+    HUAWEI_HBASE(71, 144, "HUAWEI_HBASE", "huawei_hbase"),
     ;
 
     DataSourceType(int val, int order, String name, String pluginName) {
