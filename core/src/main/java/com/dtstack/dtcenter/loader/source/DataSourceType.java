@@ -63,6 +63,8 @@ public enum DataSourceType {
     OceanBase(49, 90, "OceanBase", "oceanbase"),
     INCEPTOR(52, 91, "Inceptor", "inceptor"),
     TRINO(59, 92, "Trino", "trino"),
+    SAP_HANA1(76, 93, "SAP HANNA1", "sap_hana"),
+    SAP_HANA2(77, 94, "SAP HANNA2", "sap_hana"),
 
     // NoSQL
     HBASE(8, 100, "HBase", "hbase"),
@@ -105,6 +107,8 @@ public enum DataSourceType {
     UPDRDB(73, 146, "UPDRDB", "mysql5"),
     UPRedis(74, 147, "UPRedis", "redis"),
     CSP_S3(75, 148, "CSP S3", "csp_s3"),
+    HUAWEI_KAFKA(70, 143, "HUAWEI_KAFKA", "huawei_kafka"),
+    HUAWEI_HBASE(71, 144, "HUAWEI_HBASE", "huawei_hbase"),
     ;
 
     DataSourceType(int val, int order, String name, String pluginName) {
@@ -156,6 +160,8 @@ public enum DataSourceType {
         RDBM_S.add(DMDB_For_Oracle.val);
         RDBM_S.add(DRDS.val);
         RDBM_S.add(UPDRDB.val);
+        RDBM_S.add(SAP_HANA1.val);
+        RDBM_S.add(SAP_HANA2.val);
 
         KAFKA_S.add(KAFKA.val);
         KAFKA_S.add(KAFKA_09.val);
