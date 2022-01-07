@@ -32,8 +32,6 @@ import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.OriginalType;
 import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.schema.Types;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -55,8 +53,6 @@ import java.util.UUID;
  * company: www.dtstack.com
  */
 public class HdfsParquetWriter {
-
-    private static final Logger logger = LoggerFactory.getLogger(HdfsParquetWriter.class);
 
     private static final String KEY_PRECISION = "precision";
 
@@ -121,6 +117,7 @@ public class HdfsParquetWriter {
                         case "tinyint":
                         case "smallint":
                         case "int":
+                        case "integer":
                             group.add(i, Integer.parseInt(val));
                             break;
                         case "bigint":
@@ -261,6 +258,7 @@ public class HdfsParquetWriter {
                             case "tinyint":
                             case "smallint":
                             case "int":
+                            case "integer":
                                 group.add(columnName, Integer.parseInt(val));
                                 break;
                             case "bigint":

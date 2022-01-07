@@ -274,7 +274,7 @@ public class SqlServerClient extends AbsRdbmsClient {
     }
 
     @Override
-    public String getVersion(ISourceDTO source) {
+    public String getVersionSql() {
         return SHOW_VERSION;
     }
 

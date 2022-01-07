@@ -31,6 +31,10 @@ public class HiveSourceDTO extends RdbmsSourceDTO {
      */
     private String config;
 
+    /**
+     * hive ssl
+     */
+    private HiveSslConfig hiveSslConfig;
 
     @Override
     public Integer getSourceType() {

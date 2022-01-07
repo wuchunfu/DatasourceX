@@ -6,7 +6,7 @@
 
     <groupId>com.dtstack.dtcenter</groupId>
     <artifactId>common-loader</artifactId>
-    <version>1.7.0-SNAPSHOT</version>
+    <version>1.8.0-SNAPSHOT</version>
     <modules>
         <module>core</module>
         <module>rdbms</module>
@@ -67,7 +67,11 @@
         <module>tbds_hbase</module>
         <module>tbds_kafka</module>
         <module>tbds_hdfs</module>
+        <module>csp_s3</module>
         <module>hive3_cdp</module>
+        <module>sap_hana</module>
+        <module>huawei_hbase</module>
+        <module>huawei_kafka</module>
     </modules>
     <packaging>pom</packaging>
 
