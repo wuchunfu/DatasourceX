@@ -34,6 +34,7 @@ import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.requests.MetadataResponse;
 import org.apache.kafka.common.security.JaasUtils;
+import org.apache.zookeeper.client.ZooKeeperSaslClient;
 import scala.collection.JavaConversions;
 import sun.security.krb5.Config;
 
@@ -354,61 +355,67 @@ public class KafkaUtil {
      * @return
      */
     private synchronized static Properties initProperties(String brokerUrls, Map<String, Object> kerberosConfig) {
-        log.info("Initialize Kafka configuration information, brokerUrls : {}, kerberosConfig : {}", brokerUrls, kerberosConfig);
-        Properties props = new Properties();
-        if (StringUtils.isBlank(brokerUrls)) {
-            throw new DtLoaderException("Kafka Broker address cannot be empty");
-        }
-        /* 定义kakfa 服务的地址，不需要将所有broker指定上 */
-        props.put("bootstrap.servers", brokerUrls);
-        /* 是否自动确认offset */
-        props.put("enable.auto.commit", "true");
-        /* 设置group id */
-        props.put("group.id", KafkaConsistent.KAFKA_GROUP);
-        /* 自动确认offset的时间间隔 */
-        props.put("auto.commit.interval.ms", "1000");
-        //heart beat 默认3s
-        props.put("session.timeout.ms", "10000");
-        //一次性的最大拉取条数
-        props.put("max.poll.records", "5");
-        props.put("auto.offset.reset", "earliest");
-        /* key的序列化类 */
-        props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-        /* value的序列化类 */
-        props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-
-        /*设置超时时间*/
-        props.put("request.timeout.ms", "10500");
-        if (MapUtils.isEmpty(kerberosConfig)) {
-            return props;
-        }
-
-        // 历史数据兼容
-        if (MapUtils.isEmpty(kerberosConfig)) {
-            //不满足kerberos条件 直接返回
-            return props;
-        }
-
-        // 只需要认证的用户名
-        String kafkaKbrServiceName = MapUtils.getString(kerberosConfig, HadoopConfTool.KAFKA_KERBEROS_SERVICE_NAME);
-        kafkaKbrServiceName = kafkaKbrServiceName.split("/")[0];
-        String kafkaLoginConf = writeKafkaJaas(kerberosConfig);
-
-        // 刷新kerberos认证信息，在设置完java.security.krb5.conf后进行，否则会使用上次的krb5文件进行 refresh 导致认证失败
         try {
-            Config.refresh();
-            javax.security.auth.login.Configuration.setConfiguration(null);
+            ZooKeeperSaslClient.logout();
+            log.info("Initialize Kafka configuration information, brokerUrls : {}, kerberosConfig : {}", brokerUrls, kerberosConfig);
+            Properties props = new Properties();
+            if (StringUtils.isBlank(brokerUrls)) {
+                throw new DtLoaderException("Kafka Broker address cannot be empty");
+            }
+            /* 定义kakfa 服务的地址，不需要将所有broker指定上 */
+            props.put("bootstrap.servers", brokerUrls);
+            /* 是否自动确认offset */
+            props.put("enable.auto.commit", "true");
+            /* 设置group id */
+            props.put("group.id", KafkaConsistent.KAFKA_GROUP);
+            /* 自动确认offset的时间间隔 */
+            props.put("auto.commit.interval.ms", "1000");
+            //heart beat 默认3s
+            props.put("session.timeout.ms", "10000");
+            //一次性的最大拉取条数
+            props.put("max.poll.records", "5");
+            props.put("auto.offset.reset", "earliest");
+            /* key的序列化类 */
+            props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+            /* value的序列化类 */
+            props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+
+            /*设置超时时间*/
+            props.put("request.timeout.ms", "10500");
+            if (MapUtils.isEmpty(kerberosConfig)) {
+                return props;
+            }
+
+            // 历史数据兼容
+            if (MapUtils.isEmpty(kerberosConfig)) {
+                //不满足kerberos条件 直接返回
+                return props;
+            }
+
+            // 只需要认证的用户名
+            String kafkaKbrServiceName = MapUtils.getString(kerberosConfig, HadoopConfTool.KAFKA_KERBEROS_SERVICE_NAME);
+            kafkaKbrServiceName = kafkaKbrServiceName.split("/")[0];
+            String kafkaLoginConf = writeKafkaJaas(kerberosConfig);
+
+            // 刷新kerberos认证信息，在设置完java.security.krb5.conf后进行，否则会使用上次的krb5文件进行 refresh 导致认证失败
+            try {
+                Config.refresh();
+                javax.security.auth.login.Configuration.setConfiguration(null);
+            } catch (Exception e) {
+                log.error("Kafka kerberos authentication information refresh failed!");
+            }
+            // kerberos 相关设置
+            props.put("security.protocol", "SASL_PLAINTEXT");
+            props.put("sasl.mechanism", "GSSAPI");
+            // kafka broker的启动配置
+            props.put("sasl.kerberos.service.name", kafkaKbrServiceName);
+            System.setProperty("java.security.auth.login.config", kafkaLoginConf);
+            System.setProperty("javax.security.auth.useSubjectCredsOnly", "false");
+            return props;
         } catch (Exception e) {
-            log.error("Kafka kerberos authentication information refresh failed!");
+            destroyProperty();
+            throw new DtLoaderException("init kafka properties error", e);
         }
-        // kerberos 相关设置
-        props.put("security.protocol", "SASL_PLAINTEXT");
-        props.put("sasl.mechanism", "GSSAPI");
-        // kafka broker的启动配置
-        props.put("sasl.kerberos.service.name", kafkaKbrServiceName);
-        System.setProperty("java.security.auth.login.config", kafkaLoginConf);
-        System.setProperty("javax.security.auth.useSubjectCredsOnly", "false");
-        return props;
     }
 
 
