@@ -274,7 +274,7 @@ public class KafkaUtil {
         try {
             ZooKeeperSaslClient.logout();
             String brokerUrls = getKafkaBroker(sourceDTO);
-            log.info("Initialize Kafka configuration information, brokerUrls : {}, kerberosConfig : {}", brokerUrls, kerberosConfig);
+            log.info("Initialize Kafka configuration information, brokerUrls : {}, kerberosConfig : {}", brokerUrls, sourceDTO.getKerberosConfig());
             Properties props = new Properties();
             if (StringUtils.isBlank(brokerUrls)) {
                 throw new DtLoaderException("Kafka Broker address cannot be empty");
