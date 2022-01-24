@@ -2,6 +2,7 @@ package com.dtstack.dtcenter.common.loader.hive3;
 
 import com.dtstack.dtcenter.common.loader.common.DtClassConsistent;
 import com.dtstack.dtcenter.common.loader.common.utils.DBUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.PropertiesUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.ReflectUtil;
 import com.dtstack.dtcenter.common.loader.hadoop.util.KerberosLoginUtil;
 import com.dtstack.dtcenter.common.loader.rdbms.ConnFactory;
@@ -60,6 +61,7 @@ public class HiveConnFactory extends ConnFactory {
                         }
                         properties.put(DtClassConsistent.PublicConsistent.USER, hiveSourceDTO.getUsername() == null ? "" : hiveSourceDTO.getUsername());
                         properties.put(DtClassConsistent.PublicConsistent.PASSWORD, hiveSourceDTO.getPassword() == null ? "" : hiveSourceDTO.getPassword());
+                        PropertiesUtil.convertToProp(hiveSourceDTO, properties);
                         String urlWithoutSchema = HiveDriverUtil.removeSchema(hiveSourceDTO.getUrl());
                         return DriverManager.getConnection(urlWithoutSchema, properties);
                     } catch (Exception e) {

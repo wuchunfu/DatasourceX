@@ -1,5 +1,6 @@
 package com.dtstack.dtcenter.common.loader.phoenix5;
 
+import com.dtstack.dtcenter.common.loader.common.utils.PropertiesUtil;
 import com.dtstack.dtcenter.common.loader.hadoop.util.KerberosLoginUtil;
 import com.dtstack.dtcenter.common.loader.rdbms.ConnFactory;
 import com.dtstack.dtcenter.loader.dto.source.ISourceDTO;
@@ -105,6 +106,7 @@ public class PhoenixConnFactory extends ConnFactory {
                         props.setProperty(HadoopConfTool.HADOOP_SECURITY_AUTHORIZATION, "kerberos");
                         props.setProperty(HadoopConfTool.HBASE_SECURITY_AUTHORIZATION, "kerberos");
                     }
+                    PropertiesUtil.convertToProp(phoenix5SourceDTO, props);
                     try {
                         return DriverManager.getConnection(phoenix5SourceDTO.getUrl(), props);
                     } catch (Exception e) {
