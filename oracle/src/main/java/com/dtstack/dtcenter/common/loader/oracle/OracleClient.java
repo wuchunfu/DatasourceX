@@ -15,6 +15,7 @@ import com.dtstack.dtcenter.loader.dto.source.RdbmsSourceDTO;
 import com.dtstack.dtcenter.loader.enums.ConnectionClearStatus;
 import com.dtstack.dtcenter.loader.exception.DtLoaderException;
 import com.dtstack.dtcenter.loader.source.DataSourceType;
+import com.dtstack.dtcenter.loader.utils.AssertUtils;
 import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
 import oracle.jdbc.OracleResultSetMetaData;
