@@ -32,6 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.jetbrains.annotations.NotNull;
 
@@ -687,5 +688,10 @@ public class HiveClient extends AbsRdbmsClient {
     @Override
     protected String getFuzzySign() {
         return "*";
+    }
+
+    @Override
+    protected Pair<Character, Character> getSpecialSign() {
+        return Pair.of('`', '`');
     }
 }

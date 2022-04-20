@@ -34,6 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hive.common.type.HiveDate;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
@@ -109,6 +110,9 @@ public class InceptorClient extends AbsRdbmsClient {
 
     // metaStore 地址 principal 地址
     private final static String META_STORE_KERBEROS_PRINCIPAL = "hive.metastore.kerberos.principal";
+
+    // 获取正在使用数据库
+    private static final String CURRENT_DB = "select current_database()";
 
     @Override
     public List<String> getTableList(ISourceDTO sourceDTO, SqlQueryDTO queryDTO) {
@@ -703,5 +707,16 @@ public class InceptorClient extends AbsRdbmsClient {
             }
         }
         return result;
+    }
+
+    @Override
+    protected String getCurrentDbSql() {
+        return CURRENT_DB;
+    }
+
+
+    @Override
+    protected Pair<Character, Character> getSpecialSign() {
+        return Pair.of('`', '`');
     }
 }

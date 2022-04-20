@@ -4,6 +4,7 @@ import com.dtstack.dtcenter.common.loader.common.utils.CollectionUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.DBUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.ReflectUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.SchemaUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.StringUtil;
 import com.dtstack.dtcenter.common.loader.rdbms.AbsRdbmsClient;
 import com.dtstack.dtcenter.common.loader.rdbms.ConnFactory;
 import com.dtstack.dtcenter.loader.IDownloader;
@@ -243,7 +244,7 @@ public class OracleClient extends AbsRdbmsClient {
      */
     private List<String> getTableAndSchema(String schema, String tableName) {
         String schemaAndTableName = transferSchemaAndTableName(schema, tableName);
-        List<String> result = splitWithQuotation(schemaAndTableName, "\"");
+        List<String> result = StringUtil.splitWithQuotation(schemaAndTableName, "\"");
         Collections.reverse(result);
         return result;
     }
@@ -257,7 +258,7 @@ public class OracleClient extends AbsRdbmsClient {
      */
     private String getSchemaName(String schema, String tableName) {
         String schemaAndTableName = transferSchemaAndTableName(schema, tableName);
-        List<String> splitWithQuotations = splitWithQuotation(schemaAndTableName, "\"");
+        List<String> splitWithQuotations = StringUtil.splitWithQuotation(schemaAndTableName, "\"");
         if (splitWithQuotations.isEmpty()) {
             return schema;
         }
@@ -440,24 +441,6 @@ public class OracleClient extends AbsRdbmsClient {
             count++;
         }
         return count;
-    }
-
-    /**
-     * 正则解析出对应符号内的内容
-     *
-     * @param text
-     * @param quotationText
-     * @return
-     */
-    private static List<String> splitWithQuotation(String text, String quotationText) {
-        Pattern quotationPattern = Pattern.compile(quotationText + "(.*?)" + quotationText);
-        Matcher quotationMatch = quotationPattern.matcher(text);
-
-        ArrayList<String> results = new ArrayList<>();
-        while (quotationMatch.find()) {
-            results.add(quotationMatch.group().trim().replace(quotationText, ""));
-        }
-        return results;
     }
 
     @Override
