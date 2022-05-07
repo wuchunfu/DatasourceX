@@ -27,6 +27,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 import java.sql.Connection;
 
@@ -38,7 +39,7 @@ import java.sql.Connection;
  */
 @Data
 @ToString
-@Builder
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 public class RedisSourceDTO implements ISourceDTO {

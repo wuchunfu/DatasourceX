@@ -5,7 +5,7 @@
     <parent>
         <artifactId>common-loader</artifactId>
         <groupId>com.dtstack.dtcenter</groupId>
-        <version>1.7.0-SNAPSHOT</version>
+        <version>1.8.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -183,7 +183,18 @@
                     <artifactId>hadoop-auth</artifactId>
                     <groupId>org.apache.hadoop</groupId>
                 </exclusion>
+                <exclusion>
+                    <artifactId>groovy-all</artifactId>
+                    <groupId>org.codehaus.groovy</groupId>
+                </exclusion>
             </exclusions>
+        </dependency>
+
+        <dependency>
+            <artifactId>groovy-all</artifactId>
+            <groupId>org.codehaus.groovy</groupId>
+            <version>3.0.9</version>
+            <type>pom</type>
         </dependency>
 
         <dependency>
@@ -363,7 +374,17 @@
                     <artifactId>derby</artifactId>
                     <groupId>org.apache.derby</groupId>
                 </exclusion>
+                <exclusion>
+                    <artifactId>log4j-core</artifactId>
+                    <groupId>org.apache.logging.log4j</groupId>
+                </exclusion>
             </exclusions>
+        </dependency>
+
+        <dependency>
+            <artifactId>log4j-core</artifactId>
+            <groupId>org.apache.logging.log4j</groupId>
+            <version>2.17.1</version>
         </dependency>
 
         <dependency>
@@ -407,7 +428,17 @@
                     <artifactId>jackson-annotations</artifactId>
                     <groupId>com.fasterxml.jackson.core</groupId>
                 </exclusion>
+                <exclusion>
+                    <artifactId>json-smart</artifactId>
+                    <groupId>net.minidev</groupId>
+                </exclusion>
             </exclusions>
+        </dependency>
+
+        <dependency>
+            <artifactId>json-smart</artifactId>
+            <groupId>net.minidev</groupId>
+            <version>2.3.1</version>
         </dependency>
 
         <dependency>
@@ -424,6 +455,18 @@
             <artifactId>snappy-java</artifactId>
             <groupId>org.xerial.snappy</groupId>
             <version>1.1.2.6</version>
+        </dependency>
+
+        <dependency>
+            <artifactId>zookeeper</artifactId>
+            <groupId>org.apache.zookeeper</groupId>
+            <version>3.4.6</version>
+        </dependency>
+
+        <dependency>
+            <artifactId>jackson-databind</artifactId>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <version>2.13.2.1</version>
         </dependency>
     </dependencies>
 

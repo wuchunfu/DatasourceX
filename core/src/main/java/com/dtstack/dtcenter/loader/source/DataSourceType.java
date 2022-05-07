@@ -44,9 +44,10 @@ public enum DataSourceType {
     SQLSERVER_2017_LATER(32, 5, "SQLServer JDBC", "sqlServer"),
     PostgreSQL(4, 6, "PostgreSQL", "postgresql"),
     DB2(19, 7, "DB2", "db2"),
-    DMDB(35, 8, "DMDB", "dmdb"),
+    DMDB(35, 8, "DMDB For MySQL", "dmdb"),
     RDBMS(5, 9, "RDBMS", "mysql"),
     KINGBASE8(40, 10, "KingbaseES8", "kingbase8"),
+    DMDB_For_Oracle(67, 8, "DMDB For Oracle", "dmdb"),
 
     // Hadoop
     HIVE(7, 20, "Hive2.x", "hive"),
@@ -58,7 +59,7 @@ public enum DataSourceType {
     GREENPLUM6(36, 40, "Greenplum", "greenplum6"),
     LIBRA(21, 41, "GaussDB", "libra"),
     GBase_8a(22, 42, "GBase_8a", "gbase"),
-    DORIS(57, 43, "DorisDB", "doris"),
+    DORIS(57, 43, "Doris0.14.x(jdbc)", "doris"),
 
     // FileSystem
     HDFS(6, 60, "HDFS", "hdfs"),
@@ -79,13 +80,16 @@ public enum DataSourceType {
     Presto(48, 89, "Presto", "presto"),
     OceanBase(49, 90, "OceanBase", "oceanbase"),
     INCEPTOR(52, 91, "Inceptor", "inceptor"),
+    TRINO(59, 92, "Trino", "trino"),
+    SAP_HANA1(76, 93, "SAP HANA 1.x", "sap_hana"),
+    SAP_HANA2(77, 94, "SAP HANA 2.x", "sap_hana"),
 
     // NoSQL
     HBASE(8, 100, "HBase", "hbase"),
     HBASE2(39, 101, "HBase", "hbase"),
     Phoenix(30, 102, "Phoenix4.x", "phoenix"),
     PHOENIX5(38, 103, "Phoenix5.x", "phoenix5"),
-    ES(11, 104, "ElasticSearch5.x", "es"),
+    ES(11, 104, "ElasticSearch5.x", "es5"),
     ES6(33, 105, "ElasticSearch6.x", "es"),
     ES7(46, 106, "ElasticSearch7.x", "es7"),
     MONGODB(13, 107, "MongoDB", "mongo"),
@@ -109,7 +113,20 @@ public enum DataSourceType {
     OPENTSDB(56, 131, "OpenTSDB", "opentsdb"),
     BEATS(16, 132, "Beats", "null"),
     Spark(1002, 133, "Spark", "spark"),
-    KylinRestful(58, 135, "KylinRestful", "kylinrestful")
+    KylinRestful(58, 135, "KylinRestful", "kylinrestful"),
+
+    TBDS_HDFS(60, 136, "TBDS_HDFS", "tbds_hdfs"),
+    TBDS_HBASE(61, 137, "TBDS_HBASE", "tbds_hbase"),
+    TBDS_KAFKA(62, 138, "TBDS_KAFKA", "tbds_kafka"),
+    DorisRestful(64, 139, "Doris0.14.x(http)", "dorisrestful"),
+    HIVE3_CDP(65, 140, "Hive3_CDP", "hive3_cdp"),
+
+    DRDS(72, 145, "DRDS", "mysql5"),
+    UPDRDB(73, 146, "UPDRDB", "mysql5"),
+    UPRedis(74, 147, "UPRedis", "redis"),
+    CSP_S3(75, 148, "CSP S3", "csp_s3"),
+    HUAWEI_KAFKA(70, 143, "HUAWEI_KAFKA", "huawei_kafka"),
+    HUAWEI_HBASE(71, 144, "HUAWEI_HBASE", "huawei_hbase"),
     ;
 
     DataSourceType(int val, int order, String name, String pluginName) {
@@ -137,6 +154,7 @@ public enum DataSourceType {
         RDBM_S.add(HIVE.val);
         RDBM_S.add(HIVE1X.val);
         RDBM_S.add(HIVE3X.val);
+        RDBM_S.add(HIVE3_CDP.val);
         RDBM_S.add(Spark.val);
         RDBM_S.add(SparkThrift2_1.val);
         RDBM_S.add(Presto.val);
@@ -156,12 +174,20 @@ public enum DataSourceType {
         RDBM_S.add(OceanBase.val);
         RDBM_S.add(INCEPTOR.val);
         RDBM_S.add(KINGBASE8.val);
+        RDBM_S.add(TRINO.val);
+        RDBM_S.add(DMDB_For_Oracle.val);
+        RDBM_S.add(DRDS.val);
+        RDBM_S.add(UPDRDB.val);
+        RDBM_S.add(SAP_HANA1.val);
+        RDBM_S.add(SAP_HANA2.val);
 
         KAFKA_S.add(KAFKA.val);
         KAFKA_S.add(KAFKA_09.val);
         KAFKA_S.add(KAFKA_10.val);
         KAFKA_S.add(KAFKA_11.val);
         KAFKA_S.add(KAFKA_2X.val);
+        KAFKA_S.add(TBDS_KAFKA.val);
+        KAFKA_S.add(HUAWEI_KAFKA.val);
     }
 
     /**

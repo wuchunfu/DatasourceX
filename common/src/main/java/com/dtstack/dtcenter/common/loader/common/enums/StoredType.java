@@ -58,7 +58,7 @@ public enum StoredType {
     /**
      * KUDU
      */
-    KUDU("kudu", "KUDU","KuduInputFormat","KuduOutputFormat"),
+    KUDU("kudu", "KUDU","Kudu","Kudu"),
 
     /**
      * 未知存储类型

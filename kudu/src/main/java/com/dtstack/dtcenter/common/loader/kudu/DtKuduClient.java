@@ -22,6 +22,8 @@ import com.dtstack.dtcenter.common.loader.common.exception.IErrorPattern;
 import com.dtstack.dtcenter.common.loader.common.nosql.AbsNoSqlClient;
 import com.dtstack.dtcenter.common.loader.common.service.ErrorAdapterImpl;
 import com.dtstack.dtcenter.common.loader.common.service.IErrorAdapter;
+import com.dtstack.dtcenter.common.loader.common.utils.SearchUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.TableUtil;
 import com.dtstack.dtcenter.common.loader.hadoop.util.KerberosLoginUtil;
 import com.dtstack.dtcenter.loader.dto.ColumnMetaDTO;
 import com.dtstack.dtcenter.loader.dto.SqlQueryDTO;
@@ -96,13 +98,7 @@ public class DtKuduClient<T> extends AbsNoSqlClient<T> {
         } catch (KuduException e) {
             log.error(e.getMessage(), e);
         }
-        if (Objects.nonNull(queryDTO) && StringUtils.isNotBlank(queryDTO.getTableNamePattern())) {
-            tableList = tableList.stream().filter(table -> table.contains(queryDTO.getTableNamePattern().trim())).collect(Collectors.toList());
-        }
-        if (Objects.nonNull(queryDTO) && Objects.nonNull(queryDTO.getLimit())) {
-            tableList = tableList.stream().limit(queryDTO.getLimit()).collect(Collectors.toList());
-        }
-        return tableList;
+        return SearchUtil.handleSearchAndLimit(tableList, queryDTO);
     }
 
     @Override
@@ -115,6 +111,12 @@ public class DtKuduClient<T> extends AbsNoSqlClient<T> {
         } catch (Exception e) {
             throw new DtLoaderException(String.format("kudu client get exception : %s", e.getMessage()), e);
         }
+    }
+
+    @Override
+    public List<ColumnMetaDTO> getFlinkColumnMetaData(ISourceDTO source, SqlQueryDTO queryDTO) {
+        List<ColumnMetaDTO> columnMetaData = getColumnMetaData(source, queryDTO);
+        return TableUtil.dealColumnType(columnMetaData, KuduColumnTypeConverter::apply);
     }
 
     private List<ColumnMetaDTO> getTableColumns(org.apache.kudu.client.KuduClient client, String tableName) {

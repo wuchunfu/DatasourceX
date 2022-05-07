@@ -19,6 +19,7 @@
 package com.dtstack.dtcenter.common.loader.greenplum;
 
 import com.dtstack.dtcenter.common.loader.common.utils.DBUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.SearchUtil;
 import com.dtstack.dtcenter.common.loader.rdbms.AbsRdbmsClient;
 import com.dtstack.dtcenter.common.loader.rdbms.ConnFactory;
 import com.dtstack.dtcenter.loader.IDownloader;
@@ -92,6 +93,9 @@ public class GreenplumClient extends AbsRdbmsClient {
 
     // 获取正在使用数据库
     private static final String CURRENT_DB = "select current_database()";
+
+    // 获取正在使用 schema
+    private static final String CURRENT_SCHEMA = "select current_schema()";
 
     // 获取当前版本号
     private static final String SHOW_VERSION = "select version()";
@@ -174,7 +178,7 @@ public class GreenplumClient extends AbsRdbmsClient {
         } finally {
             DBUtil.closeDBResources(resultSet, statement, DBUtil.clearAfterGetConnection(greenplum6SourceDTO, clearStatus));
         }
-        return tableList;
+        return SearchUtil.handleSearchAndLimit(tableList, queryDTO);
     }
 
     @Override
@@ -244,6 +248,11 @@ public class GreenplumClient extends AbsRdbmsClient {
     }
 
     @Override
+    protected String getCurrentSchemaSql() {
+        return CURRENT_SCHEMA;
+    }
+
+    @Override
     protected String getVersionSql() {
         return SHOW_VERSION;
     }
@@ -258,7 +267,7 @@ public class GreenplumClient extends AbsRdbmsClient {
         }
         StringBuilder constr = new StringBuilder();
         if (StringUtils.isNotBlank(queryDTO.getTableNamePattern())) {
-            constr.append(String.format(SEARCH_SQL, addPercentSign(queryDTO.getTableNamePattern().trim())));
+            constr.append(String.format(SEARCH_SQL, addFuzzySign(queryDTO)));
         }
         if (Objects.nonNull(queryDTO.getLimit())) {
             constr.append(String.format(LIMIT_SQL, queryDTO.getLimit()));

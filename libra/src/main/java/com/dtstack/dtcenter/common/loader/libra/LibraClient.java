@@ -19,6 +19,7 @@
 package com.dtstack.dtcenter.common.loader.libra;
 
 import com.dtstack.dtcenter.common.loader.common.utils.DBUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.SearchUtil;
 import com.dtstack.dtcenter.common.loader.rdbms.AbsRdbmsClient;
 import com.dtstack.dtcenter.common.loader.rdbms.ConnFactory;
 import com.dtstack.dtcenter.loader.IDownloader;
@@ -46,11 +47,14 @@ public class LibraClient extends AbsRdbmsClient {
     // 获取正在使用数据库
     private static final String CURRENT_DB = "select current_database()";
 
+    // 获取正在使用 schema
+    private static final String CURRENT_SCHEMA = "select current_schema()";
+
     // 获取所有schema
     private static final String DATABASE_QUERY = "select nspname from pg_namespace";
 
     // 创建schema
-    private static final String CREATE_SCHEMA_SQL_TMPL = "create schema if not exists %s ";
+    private static final String CREATE_SCHEMA_SQL_TMPL = "create schema %s ";
 
     // 判断schema是否存在
     private static final String DATABASE_IS_EXISTS = "select nspname from pg_namespace where nspname = '%s'";
@@ -92,7 +96,7 @@ public class LibraClient extends AbsRdbmsClient {
             while (rs.next()) {
                 tableList.add(rs.getString(1));
             }
-            return tableList;
+            return SearchUtil.handleSearchAndLimit(tableList, queryDTO);
         } catch (Exception e) {
             throw new DtLoaderException(String.format("get table exception,%s", e.getMessage()), e);
         } finally {
@@ -120,6 +124,11 @@ public class LibraClient extends AbsRdbmsClient {
     @Override
     protected String getCurrentDbSql() {
         return CURRENT_DB;
+    }
+
+    @Override
+    protected String getCurrentSchemaSql() {
+        return CURRENT_SCHEMA;
     }
 
     @Override

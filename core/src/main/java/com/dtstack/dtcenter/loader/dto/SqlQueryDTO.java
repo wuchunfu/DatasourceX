@@ -20,6 +20,7 @@ package com.dtstack.dtcenter.loader.dto;
 
 import com.dtstack.dtcenter.loader.dto.filter.Filter;
 import com.dtstack.dtcenter.loader.enums.EsCommandType;
+import com.dtstack.dtcenter.loader.enums.MatchType;
 import lombok.Builder;
 import lombok.Data;
 import org.apache.commons.lang3.ArrayUtils;
@@ -53,9 +54,14 @@ public class SqlQueryDTO {
     private String tableName;
 
     /**
-     * 表名称(正则)
+     * 表名称搜索
      */
     private String tableNamePattern;
+
+    /**
+     * 表名称匹配类型
+     */
+    private MatchType matchType;
 
     /**
      * 表类型 部分支持，建议只使用 view 这个字段
@@ -109,6 +115,12 @@ public class SqlQueryDTO {
      * mongodb，executorQuery 分页查询，限制条数
      */
     private Integer limit;
+
+    /**
+     * 是否设置 maxRow，默认 true
+     */
+    @Builder.Default
+    private Boolean setMaxRow = true;
 
     /**
      * hbase过滤器，用户hbase自定义查询

@@ -18,26 +18,35 @@
 
 package com.dtstack.dtcenter.common.loader.rdbms;
 
+import com.dtstack.dtcenter.common.loader.common.DtClassConsistent;
 import com.dtstack.dtcenter.common.loader.common.DtClassThreadFactory;
 import com.dtstack.dtcenter.common.loader.common.exception.ErrorCode;
 import com.dtstack.dtcenter.common.loader.common.utils.CollectionUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.DBUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.ReflectUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.SearchUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.StringUtil;
 import com.dtstack.dtcenter.loader.IDownloader;
 import com.dtstack.dtcenter.loader.cache.connection.CacheConnectionHelper;
 import com.dtstack.dtcenter.loader.client.IClient;
 import com.dtstack.dtcenter.loader.dto.ColumnMetaDTO;
+import com.dtstack.dtcenter.loader.dto.Database;
 import com.dtstack.dtcenter.loader.dto.SqlQueryDTO;
 import com.dtstack.dtcenter.loader.dto.Table;
+import com.dtstack.dtcenter.loader.dto.TableInfo;
 import com.dtstack.dtcenter.loader.dto.source.ISourceDTO;
 import com.dtstack.dtcenter.loader.dto.source.RdbmsSourceDTO;
 import com.dtstack.dtcenter.loader.enums.ConnectionClearStatus;
+import com.dtstack.dtcenter.loader.enums.MatchType;
 import com.dtstack.dtcenter.loader.exception.DtLoaderException;
 import com.dtstack.dtcenter.loader.source.DataSourceType;
+import com.dtstack.dtcenter.loader.utils.AssertUtils;
 import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -54,7 +63,8 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @company: www.dtstack.com
@@ -134,12 +144,13 @@ public abstract class AbsRdbmsClient<T> implements IClient<T> {
      */
     public List<Map<String, Object>> executeQuery(RdbmsSourceDTO rdbmsSourceDTO, SqlQueryDTO queryDTO, Integer clearStatus) {
         try {
+            Boolean setMaxRow = ReflectUtil.fieldExists(SqlQueryDTO.class, "setMaxRow") ? queryDTO.getSetMaxRow() : null;
             // 预编译字段
             if (queryDTO.getPreFields() != null) {
-                return DBUtil.executeQuery(rdbmsSourceDTO.getConnection(), queryDTO.getSql(), queryDTO.getLimit(), queryDTO.getPreFields(), queryDTO.getQueryTimeout(), this::dealResult);
+                return DBUtil.executeQuery(rdbmsSourceDTO.getConnection(), queryDTO.getSql(), queryDTO.getLimit(), queryDTO.getPreFields(), queryDTO.getQueryTimeout(), setMaxRow, this::dealResult);
             }
 
-            return DBUtil.executeQuery(rdbmsSourceDTO.getConnection(), queryDTO.getSql(), queryDTO.getLimit(), queryDTO.getQueryTimeout(), this::dealResult);
+            return DBUtil.executeQuery(rdbmsSourceDTO.getConnection(), queryDTO.getSql(), queryDTO.getLimit(), queryDTO.getQueryTimeout(), setMaxRow, this::dealResult);
         } finally {
             DBUtil.closeDBResources(null, null, DBUtil.clearAfterGetConnection(rdbmsSourceDTO, clearStatus));
         }
@@ -221,10 +232,7 @@ public abstract class AbsRdbmsClient<T> implements IClient<T> {
             if (null == queryDTO) {
                 rs = meta.getTables(null, null, null, null);
             } else {
-                rs = meta.getTables(null, rdbmsSourceDTO.getSchema(),
-                        StringUtils.isNotBlank(queryDTO.getTableNamePattern()) ? queryDTO.getTableNamePattern() :
-                                queryDTO.getTableName(),
-                        DBUtil.getTableTypes(queryDTO));
+                rs = meta.getTables(null, rdbmsSourceDTO.getSchema(), null, DBUtil.getTableTypes(queryDTO));
             }
             while (rs.next()) {
                 tableList.add(rs.getString(3));
@@ -234,10 +242,7 @@ public abstract class AbsRdbmsClient<T> implements IClient<T> {
         } finally {
             DBUtil.closeDBResources(rs, null, DBUtil.clearAfterGetConnection(rdbmsSourceDTO, clearStatus));
         }
-        if (Objects.nonNull(queryDTO) && Objects.nonNull(queryDTO.getLimit())) {
-            tableList = tableList.stream().limit(queryDTO.getLimit()).collect(Collectors.toList());
-        }
-        return tableList;
+        return SearchUtil.handleSearchAndLimit(tableList, queryDTO);
     }
 
     /**
@@ -259,11 +264,28 @@ public abstract class AbsRdbmsClient<T> implements IClient<T> {
      * 执行查询sql，结果为单列
      *
      * @param source      数据源信息
+     * @param fetchSize   fetchSize
      * @param sql         sql信息
+     * @param columnIndex 取第几列
      * @param errMsg      错误信息
      * @return 查询结果
      */
     protected List<String> queryWithSingleColumn(ISourceDTO source, Integer fetchSize, String sql, Integer columnIndex, String errMsg) {
+        return queryWithSingleColumn(source, fetchSize, sql, columnIndex, errMsg, null);
+    }
+
+    /**
+     * 执行查询sql，结果为单列
+     *
+     * @param source      数据源信息
+     * @param fetchSize   fetchSize
+     * @param sql         sql信息
+     * @param columnIndex 取第几列
+     * @param errMsg      错误信息
+     * @param limit       条数限制
+     * @return 查询结果
+     */
+    protected List<String> queryWithSingleColumn(ISourceDTO source, Integer fetchSize, String sql, Integer columnIndex, String errMsg, Integer limit) {
         Integer clearStatus = beforeQuery(source, SqlQueryDTO.builder().sql(sql).build(), true);
         RdbmsSourceDTO rdbmsSourceDTO = (RdbmsSourceDTO) source;
         log.info("The SQL executed by method queryWithSingleColumn is:{}", sql);
@@ -273,6 +295,9 @@ public abstract class AbsRdbmsClient<T> implements IClient<T> {
         try {
             statement = rdbmsSourceDTO.getConnection().createStatement();
             DBUtil.setFetchSize(statement, fetchSize);
+            if (Objects.nonNull(limit)) {
+                statement.setMaxRows(limit);
+            }
             rs = statement.executeQuery(sql);
             while (rs.next()) {
                 result.add(rs.getString(columnIndex == null ? 1 : columnIndex));
@@ -324,6 +349,7 @@ public abstract class AbsRdbmsClient<T> implements IClient<T> {
         List<ColumnMetaDTO> columns = new ArrayList<>();
         try {
             statement = rdbmsSourceDTO.getConnection().createStatement();
+            statement.setMaxRows(1);
             String queryColumnSql = queryDTO.getSql();
             rs = statement.executeQuery(queryColumnSql);
             ResultSetMetaData rsMetaData = rs.getMetaData();
@@ -366,6 +392,7 @@ public abstract class AbsRdbmsClient<T> implements IClient<T> {
         List<ColumnMetaDTO> columns = new ArrayList<>();
         try {
             statement = rdbmsSourceDTO.getConnection().createStatement();
+            statement.setMaxRows(1);
             String queryColumnSql =
                     "select " + CollectionUtil.listToStr(queryDTO.getColumns()) + " from " + transferSchemaAndTableName(rdbmsSourceDTO, queryDTO) + " where 1=2";
 
@@ -460,7 +487,7 @@ public abstract class AbsRdbmsClient<T> implements IClient<T> {
                 //一个columnData存储一行数据信息
                 ArrayList<Object> columnData = Lists.newArrayList();
                 for (int i = 0; i < len; i++) {
-                    Object result = dealResult(rs.getObject(i + 1));
+                    String result = dealPreviewResult(rs.getObject(i + 1));
                     columnData.add(result);
                 }
                 previewList.add(columnData);
@@ -471,6 +498,18 @@ public abstract class AbsRdbmsClient<T> implements IClient<T> {
             DBUtil.closeDBResources(rs, stmt, DBUtil.clearAfterGetConnection(rdbmsSourceDTO, clearStatus));
         }
         return previewList;
+    }
+
+    /**
+     * 处理 RDBMS 数据源数据预览结果，返回 string 类型
+     *
+     * @param result 查询结果
+     * @return 处理后的结果
+     */
+    protected String dealPreviewResult(Object result) {
+        Object dealResult = dealResult(result);
+        // 提前进行 toString
+        return Objects.isNull(dealResult) ? null : dealResult.toString();
     }
 
     /**
@@ -646,6 +685,21 @@ public abstract class AbsRdbmsClient<T> implements IClient<T> {
         return SHOW_DB_SQL;
     }
 
+    public String getCurrentSchema(ISourceDTO source) {
+        // 获取根据schema获取表的sql
+        String sql = getCurrentSchemaSql();
+        List<String> result = queryWithSingleColumn(source, null, sql, 1, "failed to get the currently used database");
+        if (CollectionUtils.isEmpty(result)) {
+            throw new DtLoaderException("failed to get the currently used database");
+        }
+        return result.get(0);
+    }
+
+    protected String getCurrentSchemaSql() {
+        return getCurrentDbSql();
+    };
+
+
     @Override
     public String getCurrentDatabase(ISourceDTO source) {
         // 获取根据schema获取表的sql
@@ -710,13 +764,40 @@ public abstract class AbsRdbmsClient<T> implements IClient<T> {
     }
 
     /**
-     * 在字符串前后添加 %
+     * 在字符串前后添加模糊匹配字符
      *
-     * @param str 需要添加 % 的字符串
-     * @return 添加 % 后的字符串
+     * @param queryDTO 查询信息
+     * @return 添加模糊匹配字符后的字符串
      */
-    protected String addPercentSign(String str) {
-        return "%" + str + "%";
+    protected String addFuzzySign(SqlQueryDTO queryDTO) {
+        String fuzzySign = getFuzzySign();
+        if (Objects.isNull(queryDTO) || StringUtils.isBlank(queryDTO.getTableNamePattern())) {
+            return fuzzySign;
+        }
+        String defaultSign = fuzzySign + queryDTO.getTableNamePattern() + fuzzySign;
+        if (!ReflectUtil.fieldExists(SqlQueryDTO.class, "matchType")
+                || Objects.isNull(queryDTO.getMatchType())) {
+            return defaultSign;
+        }
+        if (MatchType.ALL.equals(queryDTO.getMatchType())) {
+            return queryDTO.getTableNamePattern();
+        }
+        if (MatchType.PREFIX.equals(queryDTO.getMatchType())) {
+            return queryDTO.getTableNamePattern() + fuzzySign;
+        }
+        if (MatchType.SUFFIX.equals(queryDTO.getMatchType())) {
+            return fuzzySign + queryDTO.getTableNamePattern();
+        }
+        return defaultSign;
+    }
+
+    /**
+     * 获取模糊匹配字符
+     *
+     * @return 模糊匹配字符
+     */
+    protected String getFuzzySign() {
+        return "%";
     }
 
     @Override
@@ -738,5 +819,95 @@ public abstract class AbsRdbmsClient<T> implements IClient<T> {
     @Override
     public List<String> listFileNames(ISourceDTO sourceDTO, String path, Boolean includeDir, Boolean recursive, Integer maxNum, String regexStr) {
         throw new DtLoaderException(ErrorCode.NOT_SUPPORT.getDesc());
+    }
+
+    @Override
+    public Database getDatabase(ISourceDTO sourceDTO, String dbName) {
+        AssertUtils.notBlank(dbName, "database name can't be empty.");
+        String descDbSql = getDescDbSql(dbName);
+        List<Map<String, Object>> result = executeQuery(sourceDTO, SqlQueryDTO.builder().sql(descDbSql).build());
+        if (CollectionUtils.isEmpty(result)) {
+            throw new DtLoaderException("result is empty when get database info.");
+        }
+        return parseDbResult(result);
+    }
+
+    /**
+     * 解析执行结果
+     *
+     * @param result 执行结果
+     * @return db 信息
+     */
+    public Database parseDbResult(List<Map<String, Object>> result){
+        Map<String, Object> dbInfoMap = result.get(0);
+        Database database = new Database();
+        database.setDbName(MapUtils.getString(dbInfoMap, DtClassConsistent.PublicConsistent.DB_NAME));
+        database.setComment(MapUtils.getString(dbInfoMap, DtClassConsistent.PublicConsistent.COMMENT));
+        database.setOwnerName(MapUtils.getString(dbInfoMap, DtClassConsistent.PublicConsistent.OWNER_NAME));
+        database.setLocation(MapUtils.getString(dbInfoMap, DtClassConsistent.PublicConsistent.LOCATION));
+        return database;
+    }
+
+    /**
+     * 获取描述数据库信息的 sql，数据源自身取实现
+     *
+     * @param dbName 数据库名称
+     * @return sql for desc database
+     */
+    public String getDescDbSql(String dbName) {
+        throw new DtLoaderException(ErrorCode.NOT_SUPPORT.getDesc());
+    }
+
+    /**
+     * 获取 schema 名称, 优先从 queryDTO 中取
+     *
+     * @param sourceDTO 数据源信息
+     * @param queryDTO  查询信息
+     * @return schema 名称
+     */
+    protected String getSchema(ISourceDTO sourceDTO, SqlQueryDTO queryDTO) {
+        RdbmsSourceDTO rdbmsSourceDTO = (RdbmsSourceDTO) sourceDTO;
+        if (Objects.isNull(queryDTO)) {
+            return rdbmsSourceDTO.getSchema();
+        }
+        return StringUtils.isNotBlank(queryDTO.getSchema()) ? queryDTO.getSchema() : rdbmsSourceDTO.getSchema();
+    }
+
+
+    @Override
+    public TableInfo getTableInfo(ISourceDTO sourceDTO, String tableName) {
+        TableInfo tableInfo = TableInfo.builder().build();
+        RdbmsSourceDTO rdbmsSourceDTO = (RdbmsSourceDTO) sourceDTO;
+        // 如果返回值只有一个说明不含 schema , 此时获取当前使用的 schema
+        List<String> result = StringUtil.splitWithOutQuota(tableName, '.', getSpecialSign());
+        if (result.size() == 1) {
+            tableInfo.setTableName(result.get(0));
+            if (StringUtils.isNotBlank(rdbmsSourceDTO.getSchema())) {
+                tableInfo.setSchema(rdbmsSourceDTO.getSchema());
+            } else {
+                try {
+                    // 增加 try catch
+                    tableInfo.setSchema(getCurrentSchema(sourceDTO));
+                } catch (Exception e) {
+                    // ignore error
+                    log.warn("get current schema error.", e);
+                }
+            }
+        } else if (result.size() == 2) {
+            tableInfo.setSchema(result.get(0));
+            tableInfo.setTableName(result.get(1));
+        } else {
+            throw new DtLoaderException(String.format("tableName:[%s] does not conform to the rule", tableName));
+        }
+        return tableInfo;
+    }
+
+    /**
+     * 获取特殊处理关键字、库表名等时的左右符号, 默认使用双引号
+     *
+     * @return 左右处理符号
+     */
+    protected Pair<Character, Character> getSpecialSign() {
+        return Pair.of('\"', '\"');
     }
 }

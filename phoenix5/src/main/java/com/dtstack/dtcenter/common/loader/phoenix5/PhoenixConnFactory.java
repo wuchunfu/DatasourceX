@@ -18,6 +18,7 @@
 
 package com.dtstack.dtcenter.common.loader.phoenix5;
 
+import com.dtstack.dtcenter.common.loader.common.utils.PropertiesUtil;
 import com.dtstack.dtcenter.common.loader.hadoop.util.KerberosLoginUtil;
 import com.dtstack.dtcenter.common.loader.rdbms.ConnFactory;
 import com.dtstack.dtcenter.loader.dto.source.ISourceDTO;
@@ -32,6 +33,7 @@ import org.apache.commons.lang3.StringUtils;
 import java.security.PrivilegedAction;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
@@ -122,9 +124,18 @@ public class PhoenixConnFactory extends ConnFactory {
                         props.setProperty(HadoopConfTool.HADOOP_SECURITY_AUTHORIZATION, "kerberos");
                         props.setProperty(HadoopConfTool.HBASE_SECURITY_AUTHORIZATION, "kerberos");
                     }
+                    PropertiesUtil.convertToProp(phoenix5SourceDTO, props);
                     try {
                         return DriverManager.getConnection(phoenix5SourceDTO.getUrl(), props);
                     } catch (Exception e) {
+                        if (e instanceof SQLException) {
+                            props.setProperty("phoenix.schema.isNamespaceMappingEnabled","true");
+                            try {
+                                return DriverManager.getConnection(phoenix5SourceDTO.getUrl(), props);
+                            } catch (SQLException throwables) {
+                                throw new DtLoaderException("getPhoenix5Connection error : " + e.getMessage(), e);
+                            }
+                        }
                         throw new DtLoaderException("getPhoenix5Connection error : " + e.getMessage(), e);
                     }
                 }

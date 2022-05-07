@@ -21,6 +21,7 @@ package com.dtstack.dtcenter.common.loader.presto;
 import com.dtstack.dtcenter.common.loader.common.exception.ErrorCode;
 import com.dtstack.dtcenter.common.loader.common.utils.DBUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.ReflectUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.SearchUtil;
 import com.dtstack.dtcenter.common.loader.rdbms.AbsRdbmsClient;
 import com.dtstack.dtcenter.common.loader.rdbms.ConnFactory;
 import com.dtstack.dtcenter.loader.dto.ColumnMetaDTO;
@@ -59,7 +60,7 @@ public class PrestoClient<T> extends AbsRdbmsClient<T> {
     private static final String SHOW_DB_LIKE = "SHOW SCHEMAS LIKE '%s'";
 
     // 创建schema
-    private static final String CREATE_SCHEMA = "CREATE SCHEMA IF NOT EXISTS %s";
+    private static final String CREATE_SCHEMA = "CREATE SCHEMA %s";
 
     // 判断table是否在schema中 ，不过滤视图
     private static final String TABLE_IS_IN_SCHEMA = "SELECT table_name FROM information_schema.tables WHERE table_schema='%s' AND table_name = '%s'";
@@ -114,11 +115,11 @@ public class PrestoClient<T> extends AbsRdbmsClient<T> {
     public List<String> getTableList(ISourceDTO sourceDTO, SqlQueryDTO queryDTO) {
         try {
             Integer fetchSize = ReflectUtil.fieldExists(SqlQueryDTO.class, "fetchSize") ? queryDTO.getFetchSize() : null;
-            return queryWithSingleColumn(sourceDTO, fetchSize, SHOW_TABLE_SQL, 1,"get table exception according to schema...");
+            return SearchUtil.handleSearchAndLimit(queryWithSingleColumn(sourceDTO, fetchSize, SHOW_TABLE_SQL, 1,"get table exception according to schema..."), queryDTO);
         } catch (Exception e) {
             // 如果url 中没有指定到 schema，则获取当前catalog下的所有表，并拼接形式如 "schema"."table"
             if (e.getMessage().contains(SCHEMA_MUST_BE_SET)) {
-                return getTableListBySchema(sourceDTO, queryDTO);
+                return SearchUtil.handleSearchAndLimit(getTableListBySchema(sourceDTO, queryDTO), queryDTO);
             }
             throw new DtLoaderException(e.getMessage(), e);
         }

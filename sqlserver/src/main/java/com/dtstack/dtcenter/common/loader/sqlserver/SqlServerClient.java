@@ -31,6 +31,7 @@ import com.dtstack.dtcenter.loader.dto.source.SqlserverSourceDTO;
 import com.dtstack.dtcenter.loader.exception.DtLoaderException;
 import com.dtstack.dtcenter.loader.source.DataSourceType;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -41,6 +42,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @company: www.dtstack.com
@@ -49,25 +52,34 @@ import java.util.Objects;
  * @Description：SqlServer 客户端
  */
 public class SqlServerClient extends AbsRdbmsClient {
-    private static final String TABLE_QUERY_ALL = "select table_name, table_schema from information_schema.tables where table_type in ('VIEW', 'BASE TABLE')";
-    private static final String TABLE_QUERY = "select table_name, table_schema from information_schema.tables where table_type in ('BASE TABLE')";
+    private static final String TABLE_QUERY_ALL = "select table_name, table_schema from INFORMATION_SCHEMA.TABLES where table_type in ('VIEW', 'BASE TABLE')";
+    private static final String TABLE_QUERY = "select table_name, table_schema from INFORMATION_SCHEMA.TABLES where table_type in ('BASE TABLE')";
 
-    private static final String SEARCH_BY_COLUMN_SQL = " and charIndex('%s', a.name) > 0 ";
+    private static final String SEARCH_BY_COLUMN_SQL = " and table_name like '%s' ";
 
     private static final String TABLE_SHOW = "[%s].[%s]";
 
     // 获取正在使用数据库
     private static final String CURRENT_DB = "Select Name From Master..SysDataBases Where DbId=(Select Dbid From Master..SysProcesses Where Spid = @@spid)";
 
-    private static final String SEARCH_LIMIT_SQL = "select top %s table_name from information_schema.tables where 1=1";
-    private static final String SEARCH_SQL = "select table_name from information_schema.tables where 1=1";
+    private static final String SEARCH_LIMIT_SQL = "select top %s table_name from INFORMATION_SCHEMA.TABLES where 1=1";
+    private static final String SEARCH_SQL = "select table_name from INFORMATION_SCHEMA.TABLES where 1=1";
     private static final String SCHEMA_SQL = " and table_schema='%s'";
     private static final String TABLE_NAME_SQL = " and charIndex('%s',table_name) > 0";
 
     private static final String SCHEMAS_QUERY = "select DISTINCT(name) as schema_name from sys.schemas where schema_id < 16384";
     private static String SQL_SERVER_COLUMN_NAME = "column_name";
     private static String SQL_SERVER_COLUMN_COMMENT = "column_description";
-    private static final String COMMENT_QUERY = "SELECT B.name AS column_name, C.value AS column_description FROM sys.tables A INNER JOIN sys.columns B ON B.object_id = A.object_id LEFT JOIN sys.extended_properties C ON C.major_id = B.object_id AND C.minor_id = B.column_id WHERE A.name = N";
+    private static final String COLUMN_COMMENT_QUERY = "SELECT B.name AS column_name, C.value AS column_description FROM sys.tables A INNER JOIN sys.columns B ON B.object_id = A.object_id LEFT JOIN sys.extended_properties C ON C.major_id = B.object_id AND C.minor_id = B.column_id WHERE A.name = N";
+
+    private static final String TABLE_COLUMN_COMMENT_QUERY = "SELECT B.name AS column_name, C.value AS column_description FROM (SELECT t2.object_id FROM sys.schemas as t1 INNER JOIN sys.tables as t2 on t1.schema_id = t2.schema_id and t1.name = N'%s' and t2.name = N'%s') A INNER JOIN sys.columns B ON B.object_id = A.object_id LEFT JOIN sys.extended_properties C ON C.major_id = B.object_id AND C.minor_id = B.column_id";
+
+
+    private static final String COMMENT_QUERY = "select c.name, cast(isnull(f.[value], '') as nvarchar(100)) as REMARKS from sys.objects c left join sys.extended_properties f on f.major_id = c.object_id and f.minor_id = 0 and f.class = 1 where c.type = 'u' and c.name = N'%s'";
+    private static final String TABLE_COMMENT_QUERY = "select c.name, cast(isnull(f.[value], '') as nvarchar(100)) as REMARKS from (SELECT t2.object_id FROM sys.schemas as t1 INNER JOIN sys.tables as t2 on t1.schema_id = t2.schema_id and t1.name = N'%s' and t2.name = N'%s') as a inner join sys.objects c ON c.object_id = a.object_id left join sys.extended_properties f on f.major_id = c.object_id and f.minor_id = 0 and f.class = 1 where c.type = 'u'";
+
+
+    private static final Pattern TABLE_PATTERN = Pattern.compile("\\[(?<schema>(.*))]\\.\\[(?<table>(.*))]");
 
     // 获取当前版本号
     private static final String SHOW_VERSION = "SELECT @@VERSION";
@@ -97,7 +109,7 @@ public class SqlServerClient extends AbsRdbmsClient {
         try {
             String sql = queryDTO.getView() ? TABLE_QUERY_ALL : TABLE_QUERY;
             if (StringUtils.isNotBlank(queryDTO.getTableNamePattern())) {
-                sql = sql + String.format(SEARCH_BY_COLUMN_SQL, queryDTO.getTableNamePattern());
+                sql = sql + String.format(SEARCH_BY_COLUMN_SQL, addFuzzySign(queryDTO));
             }
             // 查询schema下的
             if (StringUtils.isNotBlank(schema)) {
@@ -131,16 +143,9 @@ public class SqlServerClient extends AbsRdbmsClient {
         ResultSet resultSet = null;
         try {
             statement = sqlserverSourceDTO.getConnection().createStatement();
-            resultSet = statement.executeQuery(
-                    "select c.name, cast(isnull(f.[value], '') as nvarchar(100)) as REMARKS\n" +
-                    "from sys.objects c " +
-                    "left join sys.extended_properties f on f.major_id = c.object_id and f.minor_id = 0 and f.class = 1\n" +
-                    "where c.type = 'u'");
-            while (resultSet.next()) {
-                String dbTableName = resultSet.getString(1);
-                if (dbTableName.equalsIgnoreCase(queryDTO.getTableName())) {
-                    return resultSet.getString(DtClassConsistent.PublicConsistent.REMARKS);
-                }
+            resultSet = statement.executeQuery(queryTableCommentSql(queryDTO.getTableName()));
+            if (resultSet.next()) {
+                return resultSet.getString(DtClassConsistent.PublicConsistent.REMARKS);
             }
         } catch (Exception e) {
             throw new DtLoaderException(String.format("get table: %s's information error. Please contact the DBA to check the database、table information.",
@@ -221,7 +226,7 @@ public class SqlServerClient extends AbsRdbmsClient {
         Map<String, String> columnComments = new HashMap<>();
         try {
             statement = sourceDTO.getConnection().createStatement();
-            String queryColumnCommentSql = COMMENT_QUERY + addSingleQuotes(queryDTO.getTableName());
+            String queryColumnCommentSql = queryColumnCommentSql(queryDTO.getTableName());
             rs = statement.executeQuery(queryColumnCommentSql);
             while (rs.next()) {
                 String columnName = rs.getString(SQL_SERVER_COLUMN_NAME);
@@ -235,6 +240,41 @@ public class SqlServerClient extends AbsRdbmsClient {
             DBUtil.closeDBResources(rs, statement, DBUtil.clearAfterGetConnection(sourceDTO, clearStatus));
         }
         return columnComments;
+    }
+
+    /**
+     * 查询表字段注释
+     * @param tableName
+     * @return
+     */
+    private static String queryColumnCommentSql(String tableName) {
+        String queryColumnCommentSql;
+        Matcher matcher = TABLE_PATTERN.matcher(tableName);
+        //兼容 [schema].[table] 情况
+        if (matcher.find()) {
+            String schema = matcher.group("schema");
+            String table = matcher.group("table");
+            queryColumnCommentSql = String.format(TABLE_COLUMN_COMMENT_QUERY, schema, table);
+        } else {
+            queryColumnCommentSql = COLUMN_COMMENT_QUERY + addSingleQuotes(tableName);
+        }
+        return queryColumnCommentSql;
+    }
+
+    /**
+     * 查询表注释sql
+     * @param tableName
+     * @return
+     */
+    private static String queryTableCommentSql(String tableName) {
+        Matcher matcher = TABLE_PATTERN.matcher(tableName);
+        //兼容 [schema].[table] 情况
+        if (matcher.find()) {
+            String schema = matcher.group("schema");
+            String table = matcher.group("table");
+            return String.format(TABLE_COMMENT_QUERY, schema, table);
+        }
+        return String.format(COMMENT_QUERY, tableName);
     }
 
     private static String addSingleQuotes(String str) {
@@ -253,7 +293,7 @@ public class SqlServerClient extends AbsRdbmsClient {
     }
 
     @Override
-    public String getVersion(ISourceDTO source) {
+    public String getVersionSql() {
         return SHOW_VERSION;
     }
 
@@ -270,5 +310,10 @@ public class SqlServerClient extends AbsRdbmsClient {
             return typeName.split(" ")[0];
         }
         return typeName;
+    }
+
+    @Override
+    protected Pair<Character, Character> getSpecialSign() {
+        return Pair.of('[', ']');
     }
 }
