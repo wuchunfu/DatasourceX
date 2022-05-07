@@ -20,8 +20,10 @@ package com.dtstack.dtcenter.loader.client;
 
 import com.dtstack.dtcenter.loader.IDownloader;
 import com.dtstack.dtcenter.loader.dto.ColumnMetaDTO;
+import com.dtstack.dtcenter.loader.dto.Database;
 import com.dtstack.dtcenter.loader.dto.SqlQueryDTO;
 import com.dtstack.dtcenter.loader.dto.Table;
+import com.dtstack.dtcenter.loader.dto.TableInfo;
 import com.dtstack.dtcenter.loader.dto.source.ISourceDTO;
 
 import java.sql.Connection;
@@ -309,4 +311,22 @@ public interface IClient<T> {
      * @return 文件集合
      */
     List<String> listFileNames(ISourceDTO sourceDTO, String path, Boolean includeDir, Boolean recursive, Integer maxNum, String regexStr);
+
+    /**
+     * 获取数据库信息
+     *
+     * @param sourceDTO 数据源信息
+     * @param dbName    数据库名称
+     * @return 数据库详细信息
+     */
+    Database getDatabase(ISourceDTO sourceDTO, String dbName);
+
+    /**
+     * 获取 table 信息
+     *
+     * @param sourceDTO 数据源信息
+     * @param tableName 表名
+     * @return table 信息
+     */
+    TableInfo getTableInfo(ISourceDTO sourceDTO, String tableName);
 }

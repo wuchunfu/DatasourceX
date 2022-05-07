@@ -22,8 +22,10 @@ import com.dtstack.dtcenter.common.loader.common.exception.ErrorCode;
 import com.dtstack.dtcenter.loader.IDownloader;
 import com.dtstack.dtcenter.loader.client.IClient;
 import com.dtstack.dtcenter.loader.dto.ColumnMetaDTO;
+import com.dtstack.dtcenter.loader.dto.Database;
 import com.dtstack.dtcenter.loader.dto.SqlQueryDTO;
 import com.dtstack.dtcenter.loader.dto.Table;
+import com.dtstack.dtcenter.loader.dto.TableInfo;
 import com.dtstack.dtcenter.loader.dto.source.ISourceDTO;
 import com.dtstack.dtcenter.loader.exception.DtLoaderException;
 
@@ -167,6 +169,16 @@ public abstract class AbsNoSqlClient<T> implements IClient<T> {
 
     @Override
     public List<String> listFileNames(ISourceDTO sourceDTO, String path, Boolean includeDir, Boolean recursive,  Integer maxNum, String regexStr) {
+        throw new DtLoaderException(ErrorCode.NOT_SUPPORT.getDesc());
+    }
+
+    @Override
+    public Database getDatabase(ISourceDTO sourceDTO, String dbName) {
+        throw new DtLoaderException(ErrorCode.NOT_SUPPORT.getDesc());
+    }
+
+    @Override
+    public TableInfo getTableInfo(ISourceDTO sourceDTO, String tableName) {
         throw new DtLoaderException(ErrorCode.NOT_SUPPORT.getDesc());
     }
 }

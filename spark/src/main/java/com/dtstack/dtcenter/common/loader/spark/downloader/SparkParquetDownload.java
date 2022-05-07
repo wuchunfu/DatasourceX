@@ -267,7 +267,7 @@ public class SparkParquetDownload implements IDownloader {
         ColumnType columnType = ColumnType.fromString(type);
 
         try {
-            if (index == -1) {
+            if (index == -1 || currentLine.getFieldRepetitionCount(index) == 0) {
                 return null;
             }
 
@@ -329,7 +329,7 @@ public class SparkParquetDownload implements IDownloader {
                     break;
             }
         } catch (Exception e) {
-            log.error("{}", e.getMessage(), e);
+            // ignore error, 报错不影响结果返回, 不打印报错日志, 容易磁盘打爆
         }
 
         return String.valueOf(data);
@@ -411,7 +411,7 @@ public class SparkParquetDownload implements IDownloader {
             return;
         }
         //剔除隐藏系统文件和无关文件
-        FileStatus[] fsStatus = fs.listStatus(inputPath, path -> !path.getName().startsWith(".") && !path.getName().startsWith("_SUCCESS") && !path.getName().startsWith(IMPALA_INSERT_STAGING) && !path.getName().startsWith("_common_metadata"));
+        FileStatus[] fsStatus = fs.listStatus(inputPath, path -> !path.getName().startsWith(".") && !path.getName().startsWith("_SUCCESS") && !path.getName().startsWith(IMPALA_INSERT_STAGING) && !path.getName().startsWith("_common_metadata") && !path.getName().startsWith("_metadata"));
         if(fsStatus == null || fsStatus.length == 0){
             return;
         }

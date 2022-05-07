@@ -49,17 +49,26 @@ public class SQLServerTest extends BaseTest {
     private static final IClient client = ClientCache.getClient(DataSourceType.SQLServer.getVal());
 
     private static final SqlserverSourceDTO source = SqlserverSourceDTO.builder()
-            .url("jdbc:sqlserver://172.16.101.246:1433;databaseName=db_dev")
-            .username("dev")
-            .password("Abc12345")
+            .url("jdbc:sqlserver://172.16.101.246:1433;databaseName=TestDB")
+            .username("sa")
+            .password("d@efaX4Wp10")
             .poolConfig(PoolConfig.builder().build())
             .build();
+
+
+    @Test
+    public void executeQuery1() {
+        String sql = "SELECT sys.tables.name FROM sys.tables LEFT JOIN sys.schemas ON sys.tables.schema_id=sys.schemas.schema_id WHERE sys.tables.is_tracked_by_cdc = 1 AND sys.schemas.name = 'test'";
+        SqlQueryDTO queryDTO = SqlQueryDTO.builder().sql(sql).build();
+        List<Map<String, Object>> result = client.executeQuery(source, queryDTO);
+        Assert.assertTrue(CollectionUtils.isNotEmpty(result));
+    }
 
     @BeforeClass
     public static void beforeClass() {
         // 对表禁用CDC(变更数据捕获)功能
         String cdcCloseSql = "EXEC sys.sp_cdc_disable_table  " +
-                "@source_schema = 'dev', " +
+                "@source_schema = 'dbo', " +
                 "@source_name = 'LOADER_TEST', " +
                 "@capture_instance = 'all' ";
         SqlQueryDTO queryDTO = SqlQueryDTO.builder().sql(cdcCloseSql).build();
@@ -70,7 +79,7 @@ public class SQLServerTest extends BaseTest {
         }
         queryDTO = SqlQueryDTO.builder().sql("drop table if exists LOADER_TEST").build();
         client.executeSqlWithoutResultSet(source, queryDTO);
-        queryDTO = SqlQueryDTO.builder().sql("create table LOADER_TEST (id int, name nvarchar(50))").build();
+        queryDTO = SqlQueryDTO.builder().sql("create table LOADER_TEST (id int, name varchar(50))").build();
         client.executeSqlWithoutResultSet(source, queryDTO);
         queryDTO = SqlQueryDTO.builder().sql("insert into LOADER_TEST values (1, '中文LOADER_TEST')").build();
         client.executeSqlWithoutResultSet(source, queryDTO);
@@ -81,13 +90,22 @@ public class SQLServerTest extends BaseTest {
         client.executeSqlWithoutResultSet(source, queryDTO);
 
         // 添加表注释
-        String commentSql = "exec sp_addextendedproperty N'MS_Description', N'中文_comment', N'SCHEMA', N'dev', N'TABLE', N'LOADER_TEST'";
+        String commentSql = "exec sp_addextendedproperty N'MS_Description', N'中文_comment', N'SCHEMA', N'dbo', N'TABLE', N'LOADER_TEST'";
         queryDTO = SqlQueryDTO.builder().sql(commentSql).build();
         client.executeSqlWithoutResultSet(source, queryDTO);
 
+        String fieldCommentSql = "EXEC sp_addextendedproperty N'MS_Description', N'id主键 自增长', N'SCHEMA', N'dbo',N'TABLE', N'LOADER_TEST', N'COLUMN', N'id'";
+        queryDTO = SqlQueryDTO.builder().sql(fieldCommentSql).build();
+        client.executeSqlWithoutResultSet(source, queryDTO);
+
+        fieldCommentSql = "EXEC sp_addextendedproperty N'MS_Description', N'name 中文', N'SCHEMA', N'dbo',N'TABLE', N'LOADER_TEST', N'COLUMN', N'name'";
+        queryDTO = SqlQueryDTO.builder().sql(fieldCommentSql).build();
+        client.executeSqlWithoutResultSet(source, queryDTO);
+
+
         // 对表启用CDC(变更数据捕获)功能
         String cdcOpenSql = "EXEC sys.sp_cdc_enable_table " +
-                        "@source_schema = 'dev', " +
+                        "@source_schema = 'dbo', " +
                         "@source_name = 'LOADER_TEST', " +
                         "@role_name = NULL, " +
                         "@supports_net_changes = 0 ";
@@ -127,14 +145,14 @@ public class SQLServerTest extends BaseTest {
 
     @Test
     public void getTableListBySchema_002() {
-        SqlQueryDTO queryDTO = SqlQueryDTO.builder().schema("dev").build();
+        SqlQueryDTO queryDTO = SqlQueryDTO.builder().schema("dbo").build();
         List<String> tableList = client.getTableListBySchema(source, queryDTO);
         Assert.assertTrue(CollectionUtils.isNotEmpty(tableList));
     }
 
     @Test
     public void getTableListBySchema_003() {
-        SqlQueryDTO queryDTO = SqlQueryDTO.builder().schema("dev").tableNamePattern("d").limit(1).build();
+        SqlQueryDTO queryDTO = SqlQueryDTO.builder().schema("dbo").tableNamePattern("d").limit(1).build();
         List<String> tableList = client.getTableListBySchema(source, queryDTO);
         Assert.assertTrue(CollectionUtils.isNotEmpty(tableList));
     }
@@ -196,7 +214,7 @@ public class SQLServerTest extends BaseTest {
     public void getTableList_view() {
         SqlQueryDTO queryDTO = SqlQueryDTO.builder().view(true).tableNamePattern("loader_test_view").build();
         List<String> tableList = client.getTableList(source, queryDTO);
-        Assert.assertEquals("[dev].[loader_test_view]", tableList.get(0));
+        Assert.assertEquals("[dbo].[loader_test_view]", tableList.get(0));
     }
 
     /**
@@ -204,7 +222,7 @@ public class SQLServerTest extends BaseTest {
      */
     @Test
     public void getTableListBySchema() {
-        SqlQueryDTO queryDTO = SqlQueryDTO.builder().schema("dev").build();
+        SqlQueryDTO queryDTO = SqlQueryDTO.builder().schema("dbo").build();
         List<String> tableList = client.getTableListBySchema(source, queryDTO);
         Assert.assertTrue(CollectionUtils.isNotEmpty(tableList));
     }
@@ -234,11 +252,34 @@ public class SQLServerTest extends BaseTest {
     }
 
     /**
+     * 获取表字段信息
+     */
+    @Test
+    public void getColumnMetaData_1() {
+        SqlQueryDTO queryDTO = SqlQueryDTO.builder().tableName("[dbo].[LOADER_TEST]").build();
+        List<ColumnMetaDTO> columnMetaData = client.getColumnMetaData(source, queryDTO);
+        Assert.assertEquals("int", columnMetaData.get(0).getType());
+        Assert.assertEquals("varchar", columnMetaData.get(1).getType());
+        Assert.assertTrue(CollectionUtils.isNotEmpty(columnMetaData));
+    }
+
+    /**
      * 获取表注释
      */
     @Test
     public void getTableMetaComment() {
         SqlQueryDTO queryDTO = SqlQueryDTO.builder().tableName("LOADER_TEST").build();
+        String metaComment = client.getTableMetaComment(source, queryDTO);
+        Assert.assertEquals("中文_comment", metaComment);
+        Assert.assertTrue(StringUtils.isNotBlank(metaComment));
+    }
+
+    /**
+     * 获取表注释
+     */
+    @Test
+    public void getTableMetaComment_1() {
+        SqlQueryDTO queryDTO = SqlQueryDTO.builder().tableName("[dbo].[LOADER_TEST]").build();
         String metaComment = client.getTableMetaComment(source, queryDTO);
         Assert.assertEquals("中文_comment", metaComment);
         Assert.assertTrue(StringUtils.isNotBlank(metaComment));

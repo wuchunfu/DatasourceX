@@ -93,6 +93,18 @@ public class HadoopConfUtil {
         return combineHdfsConfig(conf, config, kerberosConfig);
     }
 
+    public static Configuration getHdfsConf(String tbdsUsername, String tbdsSecureId, String tbdsSecureKey, String defaultFS, String config, Map<String, Object> kerberosConfig) {
+        Configuration conf = new Configuration(false);
+        //tdbs 校验
+        conf.set("hadoop.security.authentication", "tbds");
+        conf.set("hadoop_security_authentication_tbds_username", tbdsUsername);
+        conf.set("hadoop_security_authentication_tbds_secureid", tbdsSecureId);
+        conf.set("hadoop_security_authentication_tbds_securekey", tbdsSecureKey);
+        // 设置默认属性
+        setHadoopDefaultConfig(conf, defaultFS, kerberosConfig);
+        return combineHdfsConfig(conf, config, kerberosConfig);
+    }
+
     /**
      * 设置 HDFS 配置信息
      *
@@ -109,6 +121,9 @@ public class HadoopConfUtil {
         }
 
         if (MapUtils.isNotEmpty(hdfsConf)) {
+            // 去除压缩格式限制
+            log.debug("remove param 'dfs.encrypt.data.transfer.cipher.suites', origin value is {}", hdfsConf.get("dfs.encrypt.data.transfer.cipher.suites"));
+            hdfsConf.remove("dfs.encrypt.data.transfer.cipher.suites");
             for (Map.Entry<String, Object> entry : hdfsConf.entrySet()) {
                 if (entry.getValue() == null) {
                     continue;
@@ -125,6 +140,10 @@ public class HadoopConfUtil {
                 conf.set(entry.getKey(), entry.getValue().toString());
             }
         }
+
+        // 禁用缓存
+        conf.setBoolean("fs.hdfs.impl.disable.cache", true);
+        conf.setBoolean("fs.file.impl.disable.cache", true);
 
         return conf;
     }

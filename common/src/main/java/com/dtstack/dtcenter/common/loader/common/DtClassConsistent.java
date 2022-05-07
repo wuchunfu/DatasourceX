@@ -104,12 +104,28 @@ public interface DtClassConsistent {
         public static final String P12_SUFFIX = ".p12";
 
         /**
+         * spark desc database xx 返回字段 key
+         */
+        public static final String SPARK_DESC_DATABASE_KEY = "database_description_item";
+
+        /**
+         * spark desc database xx 返回字段 value
+         */
+        public static final String SPARK_DESC_DATABASE_VALUE = "database_description_value";
+
+        /**
          * 数据库中对应关系字段
          */
         public static final String KEY = "key";
         public static final String NAME = "name";
         public static final String TYPE = "type";
         public static final String COMMENT = "comment";
+        public static final String DB_NAME = "db_name";
+        public static final String DATABASE_NAME = "Database Name";
+        public static final String DESCRIPTION = "Description";
+        public static final String LOCATION_SPARK = "Location";
+        public static final String OWNER_NAME = "owner_name";
+        public static final String LOCATION = "location";
         public static final String IS_PART = "isPart";
         public static final String COL_NAME = "col_name";
         public static final String DATA_TYPE = "data_type";
@@ -121,6 +137,10 @@ public interface DtClassConsistent {
 
 
         public static final String DATA_TYPE_UNSIGNED = "UNSIGNED";
+
+
+        public static final String LEFT_GREATER_SYMBOL = "<";
+        public static final String RIGHT_GREATER_SYMBOL = ">";
 
         @Deprecated
         public static final String USE_DB = "use `%s`";
@@ -155,8 +175,6 @@ public interface DtClassConsistent {
     class HadoopConfConsistent {
         public static final String HADOOP_CONFIG = "hadoopConfig";
 
-        public static final String DEFAULT_FS_REGEX = "hdfs://.*";
-
         public static final String TABLE_INFORMATION = "detailed table information";
 
         public static final String COMMENT_WITH_COLON = "Comment:";
@@ -185,5 +203,24 @@ public interface DtClassConsistent {
          * Hive text 表默认表分隔符
          */
         public static final String DEFAULT_FIELD_DELIMIT = "\001";
+    }
+
+    class SSLConsistent {
+
+        public static final String SSL = "SSL";
+
+        public static final String SSL_VERIFICATION = "SSLVerification";
+
+        public static final String SSL_KEYSTORE_PATH = "SSLKeyStorePath";
+
+        public static final String SSL_KEYSTORE_PASSWORD = "SSLKeyStorePassword";
+
+        public static final String SSL_KEYSTORE_TYPE = "SSLKeyStoreType";
+
+        public static final String SSL_TRUST_STORE_PATH = "SSLTrustStorePath";
+
+        public static final String SSL_TRUSTSTORE_PASSWORD = "SSLTrustStorePassword";
+
+        public static final String SSL_TRUSTSTORE_TYPE = "SSLTrustStoreType";
     }
 }

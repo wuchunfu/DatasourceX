@@ -52,6 +52,10 @@ import java.util.Objects;
  */
 @Slf4j
 public class PostgresqlClient extends AbsRdbmsClient {
+    private static final String SMALLSERIAL = "smallserial";
+
+    private static final String SERIAL = "serial";
+
     private static final String BIGSERIAL = "bigserial";
 
     private static final String DATABASE_QUERY = "select nspname from pg_namespace";
@@ -59,7 +63,7 @@ public class PostgresqlClient extends AbsRdbmsClient {
     private static final String DONT_EXIST = "doesn't exist";
 
     // 获取指定schema下的表，包括视图
-    private static final String SHOW_TABLE_AND_VIEW_BY_SCHEMA_SQL = "SELECT table_name FROM information_schema.tables WHERE table_schema = '%s' ";
+    private static final String SHOW_TABLE_AND_VIEW_BY_SCHEMA_SQL = "SELECT table_name FROM information_schema.tables WHERE table_schema = '%s' %s";
 
     // 获取指定schema下的表，不包括视图
     private static final String SHOW_TABLE_BY_SCHEMA_SQL = "SELECT table_name FROM information_schema.tables WHERE table_schema = '%s' AND table_type = 'BASE TABLE' %s";
@@ -73,6 +77,9 @@ public class PostgresqlClient extends AbsRdbmsClient {
     // 获取正在使用数据库
     private static final String CURRENT_DB = "select current_database()";
 
+    // 获取正在使用 schema
+    private static final String CURRENT_SCHEMA = "select current_schema()";
+
     // 根据schema选表表名模糊查询
     private static final String SEARCH_SQL = " AND table_name LIKE '%s' ";
 
@@ -83,7 +90,7 @@ public class PostgresqlClient extends AbsRdbmsClient {
     private static final String SHOW_VERSION = "show server_version";
 
     // 创建 schema
-    private static final String CREATE_SCHEMA_SQL_TMPL = "create schema if not exists %s ";
+    private static final String CREATE_SCHEMA_SQL_TMPL = "create schema %s ";
 
     // 查询表注释
     private static final String TABLE_COMMENT = "select relname as tabname, cast(obj_description(oid,'pg_class') as varchar) as comment from pg_class c where relname = '%s' %s";
@@ -164,13 +171,13 @@ public class PostgresqlClient extends AbsRdbmsClient {
             }
             StringBuilder constr = new StringBuilder();
             if (Objects.nonNull(queryDTO) && StringUtils.isNotBlank(queryDTO.getTableNamePattern())) {
-                constr.append(String.format(SEARCH_SQL, addPercentSign(queryDTO.getTableNamePattern().trim())));
+                constr.append(String.format(SEARCH_SQL, addFuzzySign(queryDTO)));
             }
             //大小写区分，不传schema默认获取所有表，并且表名签名拼接schema，格式："schema"."tableName"
             String schema = StringUtils.isNotBlank(queryDTO.getSchema()) ? queryDTO.getSchema() : postgresqlSourceDTO.getSchema();
             String querySql;
             if (StringUtils.isNotBlank(schema)) {
-                querySql = queryDTO.getView() ? String.format(SHOW_TABLE_AND_VIEW_BY_SCHEMA_SQL, schema) : String.format(SHOW_TABLE_BY_SCHEMA_SQL, schema, constr.toString());
+                querySql = queryDTO.getView() ? String.format(SHOW_TABLE_AND_VIEW_BY_SCHEMA_SQL, schema, constr.toString()) : String.format(SHOW_TABLE_BY_SCHEMA_SQL, schema, constr.toString());
             }else {
                 querySql = queryDTO.getView() ? String.format(ALL_TABLE_AND_VIEW_SQL, constr.toString()) : String.format(ALL_TABLE_SQL, constr.toString());
             }
@@ -236,7 +243,13 @@ public class PostgresqlClient extends AbsRdbmsClient {
     protected String doDealType(ResultSetMetaData rsMetaData, Integer los) throws SQLException {
         String type = super.doDealType(rsMetaData, los);
 
-        // bigserial 需要转换
+        // smallserial、serial、bigserial 需要转换
+        if (SMALLSERIAL.equalsIgnoreCase(type)) {
+            return "int2";
+        }
+        if (SERIAL.equalsIgnoreCase(type)) {
+            return "int4";
+        }
         if (BIGSERIAL.equalsIgnoreCase(type)) {
             return "int8";
         }
@@ -363,7 +376,7 @@ public class PostgresqlClient extends AbsRdbmsClient {
         log.info("current used schema：{}", schema);
         StringBuilder constr = new StringBuilder();
         if (StringUtils.isNotBlank(queryDTO.getTableNamePattern())) {
-            constr.append(String.format(SEARCH_SQL, addPercentSign(queryDTO.getTableNamePattern().trim())));
+            constr.append(String.format(SEARCH_SQL, addFuzzySign(queryDTO)));
         }
         if (Objects.nonNull(queryDTO.getLimit())) {
             constr.append(String.format(LIMIT_SQL, queryDTO.getLimit()));
@@ -382,12 +395,17 @@ public class PostgresqlClient extends AbsRdbmsClient {
         if (StringUtils.isBlank(schema)) {
             return tableName;
         }
-        return String.format("%s.%s", schema, tableName);
+        return String.format("%s.\"%s\"", schema, tableName);
     }
 
     @Override
     protected String getCurrentDbSql() {
         return CURRENT_DB;
+    }
+
+    @Override
+    protected String getCurrentSchemaSql() {
+        return CURRENT_SCHEMA;
     }
 
     @Override

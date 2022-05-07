@@ -23,6 +23,8 @@ import com.dtstack.dtcenter.common.loader.common.enums.StoredType;
 import com.dtstack.dtcenter.common.loader.common.utils.DBUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.EnvUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.ReflectUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.SearchUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.TableUtil;
 import com.dtstack.dtcenter.common.loader.hadoop.hdfs.HadoopConfUtil;
 import com.dtstack.dtcenter.common.loader.hadoop.hdfs.HdfsOperator;
 import com.dtstack.dtcenter.common.loader.hadoop.util.KerberosLoginUtil;
@@ -35,9 +37,11 @@ import com.dtstack.dtcenter.common.loader.spark.downloader.SparkTextDownload;
 import com.dtstack.dtcenter.loader.IDownloader;
 import com.dtstack.dtcenter.loader.client.ITable;
 import com.dtstack.dtcenter.loader.dto.ColumnMetaDTO;
+import com.dtstack.dtcenter.loader.dto.Database;
 import com.dtstack.dtcenter.loader.dto.SqlQueryDTO;
 import com.dtstack.dtcenter.loader.dto.Table;
 import com.dtstack.dtcenter.loader.dto.source.ISourceDTO;
+import com.dtstack.dtcenter.loader.dto.source.RdbmsSourceDTO;
 import com.dtstack.dtcenter.loader.dto.source.SparkSourceDTO;
 import com.dtstack.dtcenter.loader.enums.ConnectionClearStatus;
 import com.dtstack.dtcenter.loader.exception.DtLoaderException;
@@ -47,6 +51,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.jetbrains.annotations.NotNull;
 
@@ -74,16 +79,16 @@ import java.util.stream.Collectors;
  * @Description：Spark 连接
  */
 @Slf4j
-public class SparkClient extends AbsRdbmsClient {
+public class SparkClient<T> extends AbsRdbmsClient<T> {
 
     // 获取正在使用数据库
     private static final String CURRENT_DB = "select current_database()";
 
     // 创建库指定注释
-    private static final String CREATE_DB_WITH_COMMENT = "create database if not exists %s comment '%s'";
+    private static final String CREATE_DB_WITH_COMMENT = "create database %s comment '%s'";
 
     // 创建库
-    private static final String CREATE_DB = "create database if not exists %s";
+    private static final String CREATE_DB = "create database %s";
 
     // 查询指定schema下的表
     private static final String TABLE_BY_SCHEMA = "show tables in %s";
@@ -100,6 +105,15 @@ public class SparkClient extends AbsRdbmsClient {
     // spark table client
     private static final ITable TABLE_CLIENT = new SparkTableClient();
 
+    // show tables
+    private static final String SHOW_TABLE_SQL = "show tables";
+
+    // show tables like 'xxx'
+    private static final String SHOW_TABLE_LIKE_SQL = "show tables like '*%s*'";
+
+    // desc db info
+    private static final String DESC_DB_INFO = "desc database %s";
+
     @Override
     protected ConnFactory getConnFactory() {
         return new SparkConnFactory();
@@ -111,16 +125,26 @@ public class SparkClient extends AbsRdbmsClient {
     }
 
     @Override
-    public List<String> getTableList(ISourceDTO iSource, SqlQueryDTO queryDTO) {
-        Integer clearStatus = beforeQuery(iSource, queryDTO, false);
-        SparkSourceDTO sparkSourceDTO = (SparkSourceDTO) iSource;
+    public List<String> getTableList(ISourceDTO sourceDTO, SqlQueryDTO queryDTO) {
+        Integer clearStatus = beforeQuery(sourceDTO, queryDTO, false);
+        SparkSourceDTO sparkSourceDTO = (SparkSourceDTO) sourceDTO;
         // 获取表信息需要通过show tables 语句
-        String sql = "show tables";
+        String sql;
+        if (Objects.nonNull(queryDTO) && StringUtils.isNotEmpty(queryDTO.getTableNamePattern())) {
+            // 模糊查询
+            sql = String.format(SHOW_TABLE_LIKE_SQL, queryDTO.getTableNamePattern());
+        } else {
+            sql = SHOW_TABLE_SQL;
+        }
         Statement statement = null;
         ResultSet rs = null;
         List<String> tableList = new ArrayList<>();
         try {
             statement = sparkSourceDTO.getConnection().createStatement();
+            if (Objects.nonNull(queryDTO) && Objects.nonNull(queryDTO.getLimit())) {
+                // 设置最大条数
+                statement.setMaxRows(queryDTO.getLimit());
+            }
             DBUtil.setFetchSize(statement, queryDTO);
             rs = statement.executeQuery(sql);
             int columnSize = rs.getMetaData().getColumnCount();
@@ -132,7 +156,7 @@ public class SparkClient extends AbsRdbmsClient {
         } finally {
             DBUtil.closeDBResources(rs, statement, DBUtil.clearAfterGetConnection(sparkSourceDTO, clearStatus));
         }
-        return tableList;
+        return SearchUtil.handleSearchAndLimit(tableList, queryDTO);
     }
 
     @Override
@@ -357,6 +381,13 @@ public class SparkClient extends AbsRdbmsClient {
             // 分区表
             if (CollectionUtils.isNotEmpty(partitionColumns)) {
                 partitions = TABLE_CLIENT.showPartitions(sparkSourceDTO, queryDTO.getTableName());
+                if (CollectionUtils.isNotEmpty(partitions)) {
+                    // 转化成小写，因为分区字段即使是大写在 hdfs 上仍是小写存在
+                    partitions = partitions.stream()
+                            .filter(StringUtils::isNotEmpty)
+                            .map(String::toLowerCase)
+                            .collect(Collectors.toList());
+                }
             }
         } catch (Exception e) {
             throw new DtLoaderException(String.format("failed to get table detail: %s", e.getMessage()), e);
@@ -391,7 +422,7 @@ public class SparkClient extends AbsRdbmsClient {
         }
 
         // 校验高可用配置
-        if (StringUtils.isBlank(sparkSourceDTO.getDefaultFS()) || !sparkSourceDTO.getDefaultFS().matches(DtClassConsistent.HadoopConfConsistent.DEFAULT_FS_REGEX)) {
+        if (StringUtils.isBlank(sparkSourceDTO.getDefaultFS())) {
             throw new DtLoaderException("defaultFS incorrect format");
         }
         Configuration conf = HadoopConfUtil.getHdfsConf(sparkSourceDTO.getDefaultFS(), sparkSourceDTO.getConfig(), sparkSourceDTO.getKerberosConfig());
@@ -506,8 +537,13 @@ public class SparkClient extends AbsRdbmsClient {
             tableInfo.setName(queryDTO.getTableName());
             // 获取表注释
             tableInfo.setComment(getTableMetaComment(sparkSourceDTO.getConnection(), queryDTO.getTableName()));
-            // 处理字段信息
-            tableInfo.setColumns(getColumnMetaData(sparkSourceDTO.getConnection(), queryDTO.getTableName(), queryDTO.getFilterPartitionColumns()));
+            // 先获取全部字段，再过滤
+            List<ColumnMetaDTO> columnMetaDTOS = getColumnMetaData(sparkSourceDTO.getConnection(), queryDTO.getTableName(), false);
+            // 分区字段不为空表示是分区表
+            if (ReflectUtil.fieldExists(Table.class, "isPartitionTable")) {
+                tableInfo.setIsPartitionTable(CollectionUtils.isNotEmpty(TableUtil.getPartitionColumns(columnMetaDTOS)));
+            }
+            tableInfo.setColumns(TableUtil.filterPartitionColumns(columnMetaDTOS, queryDTO.getFilterPartitionColumns()));
             // 获取表结构信息
             getTable(tableInfo, sparkSourceDTO, queryDTO.getTableName());
         } catch (Exception e) {
@@ -550,6 +586,15 @@ public class SparkClient extends AbsRdbmsClient {
             }
 
             if (colName.contains("Table Type")) {
+                if (ReflectUtil.fieldExists(Table.class, "isView")) {
+                    tableInfo.setIsView(StringUtils.containsIgnoreCase(dataType, "VIEW"));
+                }
+                tableInfo.setExternalOrManaged(dataType);
+                continue;
+            }
+
+            // 兼容一下返回值 Type 的情况
+            if (("Type".equals(colName.trim()) || "Type:".equals(colName.trim()))  && StringUtils.isEmpty(tableInfo.getExternalOrManaged())) {
                 if (ReflectUtil.fieldExists(Table.class, "isView")) {
                     tableInfo.setIsView(StringUtils.containsIgnoreCase(dataType, "VIEW"));
                 }
@@ -654,5 +699,69 @@ public class SparkClient extends AbsRdbmsClient {
             throw new DtLoaderException("database name cannot be empty!");
         }
         return CollectionUtils.isNotEmpty(executeQuery(source, SqlQueryDTO.builder().sql(String.format(TABLE_BY_SCHEMA_LIKE, dbName, tableName)).build()));
+    }
+
+    @Override
+    public String getDescDbSql(String dbName) {
+        return String.format(DESC_DB_INFO, dbName);
+    }
+
+    @Override
+    public Database parseDbResult(List<Map<String, Object>> result) {
+        Database database = new Database();
+        for (Map<String, Object> rowMap : result) {
+            String descKey = MapUtils.getString(rowMap, DtClassConsistent.PublicConsistent.SPARK_DESC_DATABASE_KEY);
+            String descValue = MapUtils.getString(rowMap, DtClassConsistent.PublicConsistent.SPARK_DESC_DATABASE_VALUE);
+            if (StringUtils.equalsIgnoreCase(DtClassConsistent.PublicConsistent.DATABASE_NAME, descKey)) {
+                database.setDbName(descValue);
+                continue;
+            }
+
+            if (StringUtils.equalsIgnoreCase(DtClassConsistent.PublicConsistent.DESCRIPTION, descKey)) {
+                database.setComment(descValue);
+                continue;
+            }
+
+            if (StringUtils.equalsIgnoreCase(DtClassConsistent.PublicConsistent.LOCATION_SPARK, descKey)) {
+                database.setLocation(descValue);
+            }
+        }
+        return database;
+    }
+
+    @Override
+    public String getCreateTableSql(ISourceDTO source, SqlQueryDTO queryDTO) {
+        Integer clearStatus = beforeQuery(source, queryDTO, false);
+        RdbmsSourceDTO rdbmsSourceDTO = (RdbmsSourceDTO) source;
+        String schema = StringUtils.isNotBlank(queryDTO.getSchema()) ? queryDTO.getSchema() : rdbmsSourceDTO.getSchema();
+        // 获取表信息需要通过show databases 语句
+        String tableName ;
+        if (StringUtils.isNotEmpty(schema)) {
+            tableName = String.format("%s.%s", schema, queryDTO.getTableName());
+        } else {
+            tableName = queryDTO.getTableName();
+        }
+        String sql = String.format("show create table %s", tableName);
+        Statement statement = null;
+        ResultSet rs = null;
+        StringBuilder createTableSql = new StringBuilder();
+        try {
+            statement = rdbmsSourceDTO.getConnection().createStatement();
+            rs = statement.executeQuery(sql);
+            int columnSize = rs.getMetaData().getColumnCount();
+            while (rs.next()) {
+                createTableSql.append(rs.getString(columnSize == 1 ? 1 : 2));
+            }
+        } catch (Exception e) {
+            throw new DtLoaderException(String.format("failed to get the create table sql：%s", e.getMessage()), e);
+        } finally {
+            DBUtil.closeDBResources(rs, statement, DBUtil.clearAfterGetConnection(rdbmsSourceDTO, clearStatus));
+        }
+        return createTableSql.toString();
+    }
+
+    @Override
+    protected Pair<Character, Character> getSpecialSign() {
+        return Pair.of('`', '`');
     }
 }

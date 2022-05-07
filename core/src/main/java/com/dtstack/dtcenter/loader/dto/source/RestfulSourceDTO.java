@@ -25,6 +25,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 import java.sql.Connection;
 import java.util.Map;
@@ -38,9 +39,7 @@ import java.util.Map;
  */
 @Data
 @ToString
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@SuperBuilder
 public class RestfulSourceDTO implements ISourceDTO {
 
     /**
@@ -67,6 +66,19 @@ public class RestfulSourceDTO implements ISourceDTO {
      * socket 超时时间，单位：秒
      */
     private Integer socketTimeout;
+
+    /**
+     * kerberos 配置信息
+     */
+    private Map<String, Object> kerberosConfig;
+
+
+    /**
+     * sslClient.xml 的绝对路径
+     *
+     * @return
+     */
+    private String sslClientConf;
 
     @Override
     public Connection getConnection() {

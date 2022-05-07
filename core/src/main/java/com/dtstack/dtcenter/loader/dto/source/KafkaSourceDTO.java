@@ -25,6 +25,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 import java.sql.Connection;
 import java.util.Map;
@@ -37,7 +38,7 @@ import java.util.Map;
  */
 @Data
 @ToString
-@Builder
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 public class KafkaSourceDTO implements ISourceDTO {

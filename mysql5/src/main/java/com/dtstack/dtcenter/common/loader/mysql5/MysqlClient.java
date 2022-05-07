@@ -35,6 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -73,13 +74,13 @@ public class MysqlClient extends AbsRdbmsClient {
     private static final String BASE_TABLE = "'BASE TABLE'";
 
     // 表名正则匹配模糊查询
-    private static final String SEARCH_SQL = " AND table_name REGEXP '%s' ";
+    private static final String SEARCH_SQL = " AND table_name LIKE '%s' ";
 
     // 限制条数语句
     private static final String LIMIT_SQL = " limit %s ";
 
     // 创建数据库
-    private static final String CREATE_SCHEMA_SQL_TMPL = "create schema if not exists %s ";
+    private static final String CREATE_SCHEMA_SQL_TMPL = "create schema %s ";
 
     // 判断table是否在schema中
     private static final String TABLE_IS_IN_SCHEMA = "select table_name from information_schema.tables where table_schema='%s' and table_name = '%s'";
@@ -250,7 +251,7 @@ public class MysqlClient extends AbsRdbmsClient {
         log.info("current used schema：{}", schema);
         StringBuilder constr = new StringBuilder();
         if (StringUtils.isNotBlank(queryDTO.getTableNamePattern())) {
-            constr.append(String.format(SEARCH_SQL, queryDTO.getTableNamePattern()));
+            constr.append(String.format(SEARCH_SQL, addFuzzySign(queryDTO)));
         }
         if (Objects.nonNull(queryDTO.getLimit())) {
             constr.append(String.format(LIMIT_SQL, queryDTO.getLimit()));
@@ -286,5 +287,10 @@ public class MysqlClient extends AbsRdbmsClient {
     @Override
     protected String getVersionSql() {
         return SHOW_VERSION;
+    }
+
+    @Override
+    protected Pair<Character, Character> getSpecialSign() {
+        return Pair.of('`', '`');
     }
 }

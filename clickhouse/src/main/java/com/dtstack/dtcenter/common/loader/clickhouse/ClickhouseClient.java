@@ -19,6 +19,7 @@
 package com.dtstack.dtcenter.common.loader.clickhouse;
 
 import com.dtstack.dtcenter.common.loader.common.utils.DBUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.SearchUtil;
 import com.dtstack.dtcenter.common.loader.rdbms.AbsRdbmsClient;
 import com.dtstack.dtcenter.common.loader.rdbms.ConnFactory;
 import com.dtstack.dtcenter.loader.IDownloader;
@@ -77,7 +78,7 @@ public class ClickhouseClient extends AbsRdbmsClient {
         ClickHouseSourceDTO clickHouseSourceDTO = (ClickHouseSourceDTO) iSource;
         StringBuilder constr = new StringBuilder();
         if (Objects.nonNull(queryDTO) && StringUtils.isNotBlank(queryDTO.getTableNamePattern())) {
-            constr.append(String.format(SEARCH_SQL, addPercentSign(queryDTO.getTableNamePattern().trim())));
+            constr.append(String.format(SEARCH_SQL, addFuzzySign(queryDTO)));
         }
         // 获取表信息需要通过show tables 语句
         String sql = String.format(SHOW_TABLE_SQL, constr.toString());
@@ -101,7 +102,7 @@ public class ClickhouseClient extends AbsRdbmsClient {
         } finally {
             DBUtil.closeDBResources(rs, statement, DBUtil.clearAfterGetConnection(clickHouseSourceDTO, clearStatus));
         }
-        return tableList;
+        return SearchUtil.handleSearchAndLimit(tableList, queryDTO);
     }
 
     @Override

@@ -18,10 +18,11 @@
 
 package com.dtstack.dtcenter.common.loader.oracle;
 
-import com.dtstack.dtcenter.common.loader.common.DtClassConsistent;
 import com.dtstack.dtcenter.common.loader.common.utils.CollectionUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.DBUtil;
 import com.dtstack.dtcenter.common.loader.common.utils.ReflectUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.SchemaUtil;
+import com.dtstack.dtcenter.common.loader.common.utils.StringUtil;
 import com.dtstack.dtcenter.common.loader.rdbms.AbsRdbmsClient;
 import com.dtstack.dtcenter.common.loader.rdbms.ConnFactory;
 import com.dtstack.dtcenter.loader.IDownloader;
@@ -33,21 +34,24 @@ import com.dtstack.dtcenter.loader.dto.source.RdbmsSourceDTO;
 import com.dtstack.dtcenter.loader.enums.ConnectionClearStatus;
 import com.dtstack.dtcenter.loader.exception.DtLoaderException;
 import com.dtstack.dtcenter.loader.source.DataSourceType;
+import com.dtstack.dtcenter.loader.utils.AssertUtils;
+import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
 import oracle.jdbc.OracleResultSetMetaData;
 import oracle.sql.BLOB;
 import oracle.sql.CLOB;
 import oracle.xdb.XMLType;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,11 +94,17 @@ public class OracleClient extends AbsRdbmsClient {
     // 表查询基础sql
     private static final String TABLE_BASE_SQL = "SELECT TABLE_NAME FROM (%s) WHERE 1 = 1 %s ";
     // 表名正则匹配模糊查询，忽略大小写
-    private static final String TABLE_SEARCH_SQL = " AND REGEXP_LIKE (TABLE_NAME, '%s', 'i') ";
+    private static final String TABLE_SEARCH_SQL = " AND TABLE_NAME LIKE '%s' ";
     // 视图正则匹配模糊查询，忽略大小写
-    private static final String VIEW_SEARCH_SQL = " AND REGEXP_LIKE (VIEW_NAME, '%s', 'i') ";
+    private static final String VIEW_SEARCH_SQL = " AND VIEW_NAME LIKE '%s' ";
     // 限制条数语句
     private static final String LIMIT_SQL = " AND ROWNUM <= %s ";
+    // 获取表注释
+    private static final String COMMENTS_SQL = "SELECT COMMENTS FROM  all_tab_comments WHERE TABLE_NAME = '%s' ";
+    // 表注释获取条件限制
+    private static final String COMMENTS_CONDITION_SQL = " AND OWNER = '%s' ";
+    // 表注释字段
+    private static final String ORACLE_TABLE_COMMENT = "COMMENTS";
     /* ----------------------------------------------------------------------------------------- */
 
     // 获取 oracle PDB 列表前 设置 session
@@ -107,7 +117,7 @@ public class OracleClient extends AbsRdbmsClient {
     private static final String LIST_PDB = "SELECT NAME FROM v$pdbs WHERE 1 = 1 %s";
 
     // 表名正则匹配模糊查询，忽略大小写
-    private static final String PDB_SEARCH_SQL = " AND REGEXP_LIKE (NAME, '%s', 'i') ";
+    private static final String PDB_SEARCH_SQL = " AND NAME LIKE '%s' ";
 
     // 获取当前版本号
     private static final String SHOW_VERSION = "select BANNER from v$version";
@@ -128,33 +138,20 @@ public class OracleClient extends AbsRdbmsClient {
     }
 
     @Override
-    public String getTableMetaComment(ISourceDTO iSource, SqlQueryDTO queryDTO) {
-        OracleSourceDTO oracleSourceDTO = (OracleSourceDTO) iSource;
-        Integer clearStatus = beforeColumnQuery(oracleSourceDTO, queryDTO);
-
-        String tableName = queryDTO.getTableName();
-        if (tableName.contains(".")) {
-            tableName = tableName.split("\\.")[1];
+    public String getTableMetaComment(ISourceDTO sourceDTO, SqlQueryDTO queryDTO) {
+        OracleSourceDTO oracleSourceDTO = (OracleSourceDTO) sourceDTO;
+        String schema = StringUtils.isNotBlank(queryDTO.getSchema()) ? queryDTO.getSchema() : oracleSourceDTO.getSchema();
+        StringBuilder commentQuerySql = new StringBuilder();
+        commentQuerySql.append(String.format(COMMENTS_SQL, queryDTO.getTableName()));
+        if (StringUtils.isNotBlank(schema)) {
+            commentQuerySql.append(String.format(COMMENTS_CONDITION_SQL, schema));
         }
-        tableName = tableName.replace("\"", "");
-
-        Statement statement = null;
-        ResultSet resultSet = null;
-
-        try {
-            DatabaseMetaData metaData = oracleSourceDTO.getConnection().getMetaData();
-            resultSet = metaData.getTables(null, null, tableName, null);
-            while (resultSet.next()) {
-                String comment = resultSet.getString(DtClassConsistent.PublicConsistent.REMARKS);
-                return comment;
-            }
-        } catch (Exception e) {
-            throw new DtLoaderException(String.format("get table: %s's information error. Please contact the DBA to check the database、table information.",
-                    queryDTO.getTableName()), e);
-        } finally {
-            DBUtil.closeDBResources(resultSet, statement, DBUtil.clearAfterGetConnection(oracleSourceDTO, clearStatus));
+        commentQuerySql.append(String.format(LIMIT_SQL, 1));
+        List<Map<String, Object>> queryResult = executeQuery(oracleSourceDTO, SqlQueryDTO.builder().sql(commentQuerySql.toString()).build());
+        if (CollectionUtils.isEmpty(queryResult) || MapUtils.isEmpty(queryResult.get(0))) {
+            return "";
         }
-        return "";
+        return MapUtils.getString(queryResult.get(0), ORACLE_TABLE_COMMENT, "");
     }
 
     @Override
@@ -221,8 +218,10 @@ public class OracleClient extends AbsRdbmsClient {
         Map<String, String> columnComments = new HashMap<>();
         try {
             statement = sourceDTO.getConnection().createStatement();
+            List<String> tableAndSchema = getTableAndSchema(SchemaUtil.getSchema(sourceDTO, queryDTO), queryDTO.getTableName());
+            String schemaSql = tableAndSchema.size() > 1 ? " and OWNER= '" + tableAndSchema.get(1) + "'" : "";
             String queryColumnCommentSql =
-                    "select * from all_col_comments where Table_Name =" + addSingleQuotes(getTableName(sourceDTO.getSchema(), queryDTO.getTableName()));
+                    "select * from all_col_comments where Table_Name =" + addSingleQuotes(tableAndSchema.get(0)) + schemaSql;
             rs = statement.executeQuery(queryColumnCommentSql);
             while (rs.next()) {
                 String columnName = rs.getString(ORACLE_COLUMN_NAME);
@@ -255,19 +254,17 @@ public class OracleClient extends AbsRdbmsClient {
     }
 
     /**
-     * 获取表名
+     * 获取表名和 schema, 如果只有一个说明只有 tableName, 如果 list 两个值则第一个是 tableName, 第二个是 schema
      *
-     * @param schema
-     * @param tableName
-     * @return
+     * @param schema    schema
+     * @param tableName 表名
+     * @return schema and tableName
      */
-    private String getTableName(String schema, String tableName) {
+    private List<String> getTableAndSchema(String schema, String tableName) {
         String schemaAndTableName = transferSchemaAndTableName(schema, tableName);
-        List<String> splitWithQuotations = splitWithQuotation(schemaAndTableName, "\"");
-        if (splitWithQuotations.size() != 2) {
-            return tableName;
-        }
-        return splitWithQuotations.get(1);
+        List<String> result = StringUtil.splitWithQuotation(schemaAndTableName, "\"");
+        Collections.reverse(result);
+        return result;
     }
 
     /**
@@ -279,7 +276,7 @@ public class OracleClient extends AbsRdbmsClient {
      */
     private String getSchemaName(String schema, String tableName) {
         String schemaAndTableName = transferSchemaAndTableName(schema, tableName);
-        List<String> splitWithQuotations = splitWithQuotation(schemaAndTableName, "\"");
+        List<String> splitWithQuotations = StringUtil.splitWithQuotation(schemaAndTableName, "\"");
         if (splitWithQuotations.isEmpty()) {
             return schema;
         }
@@ -366,9 +363,9 @@ public class OracleClient extends AbsRdbmsClient {
     @Override
     protected String getTableBySchemaSql(ISourceDTO sourceDTO, SqlQueryDTO queryDTO) {
         // 构造表名模糊查询和条数限制sql
-        String tableConstr = buildSearchSql(TABLE_SEARCH_SQL, queryDTO.getTableNamePattern(), queryDTO.getLimit());
+        String tableConstr = buildSearchSql(TABLE_SEARCH_SQL, queryDTO, queryDTO.getLimit());
         // 构造视图模糊查询和条数限制sql
-        String viewConstr = buildSearchSql(VIEW_SEARCH_SQL, queryDTO.getTableNamePattern(), queryDTO.getLimit());
+        String viewConstr = buildSearchSql(VIEW_SEARCH_SQL, queryDTO, queryDTO.getLimit());
         String schema = queryDTO.getSchema();
         // schema若为空，则查询所有schema下的表
         String searchSql;
@@ -386,14 +383,14 @@ public class OracleClient extends AbsRdbmsClient {
     /**
      * 构造模糊查询、条数限制sql
      * @param tableSearchSql
-     * @param tableNamePattern
+     * @param queryDTO
      * @param limit
      * @return
      */
-    private String buildSearchSql(String tableSearchSql, String tableNamePattern, Integer limit) {
+    private String buildSearchSql(String tableSearchSql, SqlQueryDTO queryDTO, Integer limit) {
         StringBuilder constr = new StringBuilder();
-        if (org.apache.commons.lang3.StringUtils.isNotBlank(tableNamePattern)) {
-            constr.append(String.format(tableSearchSql, tableNamePattern));
+        if (org.apache.commons.lang3.StringUtils.isNotBlank(queryDTO.getTableNamePattern())) {
+            constr.append(String.format(tableSearchSql, addFuzzySign(queryDTO)));
         }
         if (Objects.nonNull(limit)) {
             constr.append(String.format(LIMIT_SQL, limit));
@@ -464,24 +461,6 @@ public class OracleClient extends AbsRdbmsClient {
         return count;
     }
 
-    /**
-     * 正则解析出对应符号内的内容
-     *
-     * @param text
-     * @param quotationText
-     * @return
-     */
-    private static List<String> splitWithQuotation(String text, String quotationText) {
-        Pattern quotationPattern = Pattern.compile(quotationText + "(.*?)" + quotationText);
-        Matcher quotationMatch = quotationPattern.matcher(text);
-
-        ArrayList<String> results = new ArrayList<>();
-        while (quotationMatch.find()) {
-            results.add(quotationMatch.group().trim().replace(quotationText, ""));
-        }
-        return results;
-    }
-
     @Override
     protected String getCurrentDbSql() {
         return CURRENT_DB;
@@ -519,7 +498,7 @@ public class OracleClient extends AbsRdbmsClient {
         // 执行后 将从 root 获取 PDB，否则获取到的为当前用户所在的 PDB
         try {
             // 构造 pdb 模糊查询和条数限制sql
-            String pdbConstr = buildSearchSql(PDB_SEARCH_SQL, queryDTO.getTableNamePattern(), queryDTO.getLimit());
+            String pdbConstr = buildSearchSql(PDB_SEARCH_SQL, queryDTO, queryDTO.getLimit());
             // 切换到 cdb root，此处不关闭 connection
             DBUtil.executeSqlWithoutResultSet(oracleSourceDTO.getConnection(), String.format(ALTER_PDB_SESSION, CDB_ROOT));
             List<Map<String, Object>> pdbList = executeQuery(oracleSourceDTO, SqlQueryDTO.builder().sql(String.format(LIST_PDB, pdbConstr)).build(), ConnectionClearStatus.NORMAL.getValue());
